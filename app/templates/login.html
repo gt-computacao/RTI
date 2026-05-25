@@ -10,7 +10,25 @@
       <p class="muted">Entre com sua conta institucional Google.</p>
     </div>
 
-    {% if error %}
+    {% if request.query_params.get("logged_out") %}
+      <div class="alert alert-success">
+        Você saiu com sucesso. Ao entrar novamente, escolha a conta Google desejada.
+      </div>
+    {% endif %}
+
+    {% if error == "oauth" %}
+      <div class="alert alert-error">
+        Falha na autenticação Google (sessão expirada ou interrompida). Feche abas antigas do sistema e tente de novo.
+      </div>
+    {% elif error == "userinfo" %}
+      <div class="alert alert-error">
+        O Google não retornou os dados do perfil. Tente novamente ou use outra conta.
+      </div>
+    {% elif error == "email" %}
+      <div class="alert alert-error">
+        Sua conta Google não possui e-mail visível. Verifique as permissões ou use outra conta.
+      </div>
+    {% elif error %}
       <div class="alert alert-error">
         Não foi possível autenticar. Tente novamente.
       </div>
@@ -28,6 +46,7 @@
 
     <p class="muted small mt-2">
       Ao entrar pela primeira vez, sua conta será criada automaticamente.
+      Para trocar de conta Google, use <strong>Sair</strong> e entre de novo — a tela de seleção de contas será exibida.
     </p>
   </div>
 </div>

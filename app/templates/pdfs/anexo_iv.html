@@ -44,64 +44,43 @@
   Lei nº 13.123/2015, a título gratuito, sem qualquer restrição quanto à forma, tempo ou
   lugar, desde já, ficando autorizadas quaisquer atualizações que venham a ser
   consubstanciadas em futuras atualizações, modificações ou derivações tecnológicas.
-  {% if pi.has_partner %}
-  Os cedentes declaram estar cientes que, conforme a Política de Inovação do IFMS e o
-  Contrato de Cotitularidade de Propriedade Intelectual entre o IFMS e {{ pi.partner_name }}, caberá:
+  {% if has_external_partners(pi) %}
+  Os cedentes declaram estar cientes que, conforme a Política de Inovação do IFMS e os
+  contratos de cotitularidade aplicáveis, caberá:
   {% else %}
   Os cedentes declaram estar cientes que, conforme a Política de Inovação do IFMS, caberá:
   {% endif %}
 </p>
 
-{% if pi.has_partner %}
-  {% set partner_pct = pi.partner_percentage|default(50, true)|float %}
-  {% set ifms_pct = 100 - partner_pct %}
+{% set ifms_inst = pi.institutions|selectattr('is_ifms')|first %}
+{% set partner_insts = pi.institutions|rejectattr('is_ifms')|list %}
 
-  {# Authors grouped by institution #}
-  {% set partner_authors = [] %}
-  {% set ifms_authors = [] %}
-  {% for pa in pi.authors %}
-    {% if pa.institution == 'partner' %}
-      {% if partner_authors.append(pa) %}{% endif %}
-    {% else %}
-      {% if ifms_authors.append(pa) %}{% endif %}
+{% if partner_insts %}
+  {% for inst in partner_insts %}
+    {% set inst_authors = authors_for_institution(pi, inst) %}
+    {% if inst_authors %}
+<p class="text-justify">
+  {{ inst.percentage|fpercent }} da titularidade à/ao {{ inst.name }}, sendo este percentual subdividido em três partes de 1/3, onde duas destas partes destinam-se a {{ inst.name }} e a outra parte cabe aos autores inventores, os quais realizarão a divisão na proporção de
+  {% for pa in inst_authors %}
+    {{ pa|within_institution_percent(pi)|fpercent }} ao Autor {{ loop.index }}: {{ pa.name }}{% if not loop.last %} e {% endif %}
+  {% endfor %}
+  {%- if not loop.last and ifms_inst %};{% elif loop.last and ifms_inst %} e{% else %}.{% endif %}
+</p>
     {% endif %}
   {% endfor %}
+{% endif %}
 
-  {# Partner percentage totals for proportional display #}
-  {% set partner_total_pct = namespace(val=0) %}
-  {% for pa in partner_authors %}
-    {% set partner_total_pct.val = partner_total_pct.val + pa.percentage|float %}
-  {% endfor %}
-  {% set ifms_total_pct = namespace(val=0) %}
-  {% for pa in ifms_authors %}
-    {% set ifms_total_pct.val = ifms_total_pct.val + pa.percentage|float %}
-  {% endfor %}
-
+{% if ifms_inst %}
+  {% set ifms_authors = authors_for_institution(pi, ifms_inst) %}
+  {% if ifms_authors %}
 <p class="text-justify">
-  {{ partner_pct|fpercent }} da titularidade à/ao {{ pi.partner_name }}, sendo este percentual subdividido em três partes de 1/3, onde duas destas partes destinam-se a {{ pi.partner_name }} e a outra parte cabe aos autores inventores, os quais realizarão a divisão na proporção de
-  {% for pa in partner_authors %}
-    {%- if partner_total_pct.val > 0 -%}
-      {{ ((pa.percentage|float / partner_total_pct.val) * 100)|fpercent }}
-    {%- else -%}
-      {{ pa.percentage|fpercent }}
-    {%- endif %} ao Autor {{ loop.index }}: {{ pa.name }}
-    {%- if not loop.last %} e {% endif -%}
-  {% endfor %}
-  {%- if not ifms_authors %}.{% else %} e{% endif %}
-</p>
-<p class="text-justify">
-  {{ ifms_pct|fpercent }} da titularidade ao IFMS, sendo este percentual subdividido em três partes de 1/3, conforme Art. 36 da Política de Inovação do IFMS, onde duas destas partes destinam-se ao IFMS e a outra parte cabe aos autores inventores, os quais realizarão a divisão na proporção de
+  {{ ifms_inst.percentage|fpercent }} da titularidade ao IFMS, sendo este percentual subdividido em três partes de 1/3, conforme Art. 36 da Política de Inovação do IFMS, onde duas destas partes destinam-se ao IFMS e a outra parte cabe aos autores inventores, os quais realizarão a divisão na proporção de
   {% for pa in ifms_authors %}
-    {%- if ifms_total_pct.val > 0 -%}
-      {{ ((pa.percentage|float / ifms_total_pct.val) * 100)|fpercent }}
-    {%- else -%}
-      {{ pa.percentage|fpercent }}
-    {%- endif %} ao Autor {{ loop.index }}: {{ pa.name }}
-    {%- if not loop.last %} e {% endif -%}
+    {{ pa|within_institution_percent(pi)|fpercent }} ao Autor {{ loop.index }}: {{ pa.name }}{% if not loop.last %} e {% endif %}
   {% endfor %}.
 </p>
-
-{% else %}
+  {% endif %}
+{% elif not partner_insts %}
 <p class="text-justify">
   100% da titularidade ao IFMS, sendo este percentual subdividido em três partes de 1/3,
   conforme Art. 36 da Política de Inovação do IFMS, onde duas destas partes destinam-se ao

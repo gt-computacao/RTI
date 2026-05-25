@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.deps import home_url_for
 from app.models import User, UserRole
 from app.templating import templates
 
@@ -21,7 +22,11 @@ oauth.register(
     client_id=settings.google_client_id,
     client_secret=settings.google_client_secret,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
+    client_kwargs={
+        "scope": "openid email profile",
+        # Forces Google account chooser so logout + login can switch accounts.
+        "prompt": "select_account",
+    },
 )
 
 
@@ -29,8 +34,9 @@ oauth.register(
 async def login_page(request: Request, db: Session = Depends(get_db)):
     user_id = request.session.get("user_id")
     if user_id:
-        if db.get(User, user_id):
-            return RedirectResponse(url="/dashboard", status_code=303)
+        existing = db.get(User, user_id)
+        if existing:
+            return RedirectResponse(url=home_url_for(existing), status_code=303)
         request.session.clear()
     error = request.query_params.get("error")
     return templates.TemplateResponse(
@@ -75,15 +81,10 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        role = (
-            UserRole.admin
-            if email in settings.admin_emails_list
-            else UserRole.author
-        )
         user = User(
             name=name,
             email=email,
-            role=role,
+            role=UserRole.author,
             google_sub=sub,
             picture=picture,
         )
@@ -101,17 +102,14 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
         if picture and user.picture != picture:
             user.picture = picture
             changed = True
-        if email in settings.admin_emails_list and user.role != UserRole.admin:
-            user.role = UserRole.admin
-            changed = True
         if changed:
             db.commit()
 
     request.session["user_id"] = user.id
-    return RedirectResponse(url="/dashboard", status_code=303)
+    return RedirectResponse(url=home_url_for(user), status_code=303)
 
 
 @router.get("/logout", name="logout")
 async def logout(request: Request):
     request.session.clear()
-    return RedirectResponse(url="/login", status_code=303)
+    return RedirectResponse(url="/login?logged_out=1", status_code=303)

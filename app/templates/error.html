@@ -6,7 +6,8 @@
     <div class="error-icon">!</div>
     <h1>{{ status_code }}</h1>
     <p>{{ detail }}</p>
-    <a href="/dashboard" class="btn btn-primary">Voltar ao dashboard</a>
+    {% set _is_admin = request.state.is_admin if request.state and request.state.is_admin else False %}
+    <a href="{{ '/admin' if _is_admin else '/dashboard' }}" class="btn btn-primary">Voltar ao início</a>
   </div>
 </div>
 {% endblock %}

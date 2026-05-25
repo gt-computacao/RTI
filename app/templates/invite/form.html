@@ -171,7 +171,7 @@
   <fieldset>
     <legend>Vínculo institucional</legend>
     <div class="form-row">
-      <label>Vínculo com IFMS *</label>
+      <label>Vínculo *</label>
       <select name="ifms_bond" id="invite_ifms_bond" required>
         <option value="">Selecione...</option>
         {% set bond = s.ifms_bond if s else (p.ifms_bond.value if p and p.ifms_bond else '') %}
@@ -300,7 +300,7 @@
   }
 
   function applyUploads(root) {
-    const inputs = (root || document).querySelectorAll(".upload-input");
+    const inputs = (root || document).querySelectorAll(".upload-input:not([data-upload-bound])");
     inputs.forEach((input) => {
       const wrap   = input.closest(".upload");
       const btn    = wrap?.querySelector(".upload-btn");
@@ -309,6 +309,7 @@
       const rmBtn  = wrap?.querySelector(".upload-remove-btn");
       if (!btn || !nameEl || !txtEl) return;
 
+      input.dataset.uploadBound = "1";
       const baseLabel = btn.getAttribute("data-upload-label") || "Escolher arquivo";
 
       const update = () => {

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""Seed an admin user in the database.
+"""Seed default admin user in the database.
 
 Usage (inside Docker container):
     docker compose exec app python scripts/seed_admin.py --email admin@ifms.edu.br --name "Admin IFMS"
 
-Or without arguments (uses the first email from ADMIN_EMAILS in .env):
+Or without arguments (uses SEED_ADMIN_EMAIL / SEED_ADMIN_NAME from .env):
     docker compose exec app python scripts/seed_admin.py
-
-If the user already exists, it promotes them to admin.
 """
 
 import argparse
@@ -22,6 +20,7 @@ from app.models import User, UserRole
 
 
 def seed_admin(email: str, name: str) -> None:
+    email = email.lower().strip()
     with SessionLocal() as db:
         existing = db.query(User).filter(User.email == email).first()
         if existing:
@@ -49,20 +48,14 @@ def main():
     parser.add_argument("--name", type=str, default=None, help="Admin name")
     args = parser.parse_args()
 
-    email = args.email
-    name = args.name
+    email = args.email or settings.seed_admin_email
+    name = args.name or settings.seed_admin_name
 
     if not email:
-        if settings.admin_emails_list:
-            email = settings.admin_emails_list[0]
-        else:
-            print("ERROR: No --email provided and ADMIN_EMAILS is empty in .env")
-            sys.exit(1)
+        print("ERROR: No --email provided and SEED_ADMIN_EMAIL is empty")
+        sys.exit(1)
 
-    if not name:
-        name = "Admin"
-
-    seed_admin(email.lower().strip(), name)
+    seed_admin(email, name)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,6 @@ from app.database import get_db
 from app.deps import require_user
 from app.models import (
     AdminNotification,
-    AuthorDeclaration,
     AuthorDocument,
     AuthorDocumentType,
     AuthorProfile,
@@ -23,12 +22,24 @@ from app.models import (
     PI,
     PIAuthor,
     PIAuthorStatus,
+    PIInstitution,
     PIStatus,
     PIType,
     User,
     UserRole,
 )
 from app.config import settings
+from app.routers.pi_form_helpers import validate_participation_form
+from app.services.admin_users import get_admin_emails
+from app.services.pi_catalog import assign_pi_catalogs, load_catalogs, parse_ids_from_form
+from app.services.pi_institutions_form import (
+    institution_options,
+    institutions_for_template,
+    new_partner_key,
+    partners_from_form_lists,
+    replace_institutions,
+    save_institutions,
+)
 from app.services.author_documents_service import save_flexible_upload, save_required_upload
 from app.services.invitations import create_invitation, send_invitation_email
 from app.templating import IFMS_BOND_LABELS, IFMS_CAMPUSES, PI_TYPE_LABELS, templates
@@ -67,11 +78,22 @@ def _empty_primary() -> dict:
     }
 
 
+@router.get("/pis/_partner_institution_row", name="pi_partner_institution_row", response_class=HTMLResponse)
+async def partner_institution_row(request: Request, user: User = Depends(require_user)):
+    return templates.TemplateResponse(
+        request, "pi/_partner_institution_row.html",
+        {"p": {"key": new_partner_key(), "name": "", "percentage": "", "cnpj": "", "contact": ""}},
+    )
+
+
 @router.get("/pis/_coauthor_row", name="pi_coauthor_row", response_class=HTMLResponse)
 async def coauthor_row(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse(
         request, "pi/_coauthor_row.html",
-        {"c": {"name": "", "email": "", "percentage": ""}},
+        {
+            "c": {"name": "", "email": "", "percentage": "", "institution_key": "ifms"},
+            "institution_options": [{"key": "ifms", "name": "IFMS"}],
+        },
     )
 
 
@@ -84,34 +106,64 @@ def _empty_form() -> dict:
         "programming_language": "",
         "creation_date": "",
         "publication_date": "",
-        "application_field": "",
-        "program_type": "",
+        "application_field_ids": [],
+        "program_type_ids": [],
         "source_hash": "",
         "is_derived": False,
         "derived_title": "",
         "derived_registration": "",
-        # Marca fields
-        "marca_nome": "",
-        "marca_tipo": "",
-        "marca_idioma_estrangeiro": False,
-        "marca_termo_estrangeiro": "",
-        "marca_traducao": "",
-        "marca_termos_colidencia": "",
-        "marca_nice": "",
-        "marca_viena": "",
-        "marca_protecao_indicada": False,
-        "marca_protecao_justificativa": "",
-        # Partner
-        "has_partner": False,
-        "partner_name": "",
-        "partner_cnpj": "",
-        "partner_contact": "",
+        # Brand (marca) fields
+        "brand_name": "",
+        "brand_type": "",
+        "brand_has_foreign_language": False,
+        "brand_foreign_term": "",
+        "brand_translation": "",
+        "brand_collision_terms": "",
+        "brand_nice_classification": "",
+        "brand_vienna_classification": "",
+        "brand_protection_requested": False,
+        "brand_protection_justification": "",
+        "ifms_institution_percentage": "100",
         "primary_percentage": "",
+        "primary_institution_key": "ifms",
+    }
+
+
+def _participation_template_context(pi: PI | None = None, partners: list | None = None) -> dict:
+    inst_slice, partners_db = institutions_for_template(pi)
+    partner_rows = partners if partners is not None else partners_db
+    form = {**_empty_form(), **inst_slice}
+    if pi:
+        primary = next((a for a in pi.authors if a.is_primary), None)
+        if primary:
+            form["primary_percentage"] = str(float(primary.percentage))
+            form["primary_institution_key"] = (
+                f"partner-{primary.institution_id}"
+                if primary.institution and not primary.institution.is_ifms
+                else "ifms"
+            )
+    return {
+        "form": form,
+        "partner_institutions": partner_rows,
+        "institution_options": institution_options(pi, partner_rows),
+    }
+
+
+def _catalog_template_context(db: Session) -> dict:
+    app_fields, prog_types = load_catalogs(db)
+    return {
+        "application_fields_catalog": app_fields,
+        "program_types_catalog": prog_types,
     }
 
 
 @router.get("/pis/new", name="pi_new")
-async def pi_new_form(request: Request, user: User = Depends(require_user)):
+async def pi_new_form(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    part_ctx = _participation_template_context()
     return templates.TemplateResponse(
         request, "pi/new.html",
         {
@@ -120,12 +172,15 @@ async def pi_new_form(request: Request, user: User = Depends(require_user)):
             "ifms_bonds": IFMS_BOND_LABELS,
             "ifms_campuses": IFMS_CAMPUSES,
             "errors": [],
-            "form": _empty_form(),
+            "form": {**_empty_form(), **part_ctx["form"]},
             "primary": _empty_primary(),
             "coauthors": [],
+            "partner_institutions": part_ctx["partner_institutions"],
+            "institution_options": part_ctx["institution_options"],
             "accepted_truth": False,
             "accepted_confidentiality": False,
             "edit_mode": False,
+            **_catalog_template_context(db),
         },
     )
 
@@ -148,41 +203,31 @@ async def pi_create(
     programming_language = (form.get("programming_language") or "").strip()
     creation_date_raw = (form.get("creation_date") or "").strip()
     publication_date_raw = (form.get("publication_date") or "").strip()
-    application_field = (form.get("application_field") or "").strip()
-    program_type = (form.get("program_type") or "").strip()
+    application_field_ids = parse_ids_from_form(form, "application_field_ids")
+    program_type_ids = parse_ids_from_form(form, "program_type_ids")
     source_hash = (form.get("source_hash") or "").strip()
     is_derived = form.get("is_derived") in ("on", "true", "1")
     derived_title = (form.get("derived_title") or "").strip()
     derived_registration = (form.get("derived_registration") or "").strip()
 
-    # ---- Marca fields ----
-    marca_nome = (form.get("marca_nome") or "").strip()
-    marca_tipo = (form.get("marca_tipo") or "").strip()
-    marca_idioma_estrangeiro = form.get("marca_idioma_estrangeiro") in ("on", "true", "1")
-    marca_termo_estrangeiro = (form.get("marca_termo_estrangeiro") or "").strip()
-    marca_traducao = (form.get("marca_traducao") or "").strip()
-    marca_termos_colidencia = (form.get("marca_termos_colidencia") or "").strip()
-    marca_nice = (form.get("marca_nice") or "").strip()
-    marca_viena = (form.get("marca_viena") or "").strip()
-    marca_protecao_indicada = form.get("marca_protecao_indicada") in ("on", "true", "1")
-    marca_protecao_justificativa = (form.get("marca_protecao_justificativa") or "").strip()
-    marca_imagem_upload = form.get("marca_imagem_file")
+    # ---- Brand (marca) fields ----
+    brand_name = (form.get("brand_name") or "").strip()
+    brand_type = (form.get("brand_type") or "").strip()
+    brand_has_foreign_language = form.get("brand_has_foreign_language") in ("on", "true", "1")
+    brand_foreign_term = (form.get("brand_foreign_term") or "").strip()
+    brand_translation = (form.get("brand_translation") or "").strip()
+    brand_collision_terms = (form.get("brand_collision_terms") or "").strip()
+    brand_nice_classification = (form.get("brand_nice_classification") or "").strip()
+    brand_vienna_classification = (form.get("brand_vienna_classification") or "").strip()
+    brand_protection_requested = form.get("brand_protection_requested") in ("on", "true", "1")
+    brand_protection_justification = (form.get("brand_protection_justification") or "").strip()
+    brand_image_upload = form.get("brand_image_file")
 
     # ---- Software uploads ----
     video_upload = form.get("video_file")
     source_code_upload = form.get("source_code_file")
 
-    has_partner = form.get("has_partner") in ("on", "true", "1")
-    partner_name = (form.get("partner_name") or "").strip() or None
-    partner_cnpj = (form.get("partner_cnpj") or "").strip() or None
-    partner_contact = (form.get("partner_contact") or "").strip() or None
     primary_percentage = (form.get("primary_percentage") or "").strip()
-
-    # ---- Coautores ----
-    coauthor_names = form.getlist("coauthor_name")
-    coauthor_emails = form.getlist("coauthor_email")
-    coauthor_percentages = form.getlist("coauthor_percentage")
-    coauthor_institutions = form.getlist("coauthor_institution")
 
     # ---- Profile do autor principal ----
     primary = {
@@ -228,10 +273,10 @@ async def pi_create(
     if pi_type_enum == PIType.software:
         if not programming_language:
             errors.append("Informe a linguagem de programação.")
-        if not application_field:
-            errors.append("Informe o campo de aplicação.")
-        if not program_type:
-            errors.append("Informe o tipo de programa.")
+        if not application_field_ids:
+            errors.append("Selecione pelo menos um campo de aplicação.")
+        if not program_type_ids:
+            errors.append("Selecione pelo menos um tipo de programa.")
         if not source_hash:
             errors.append("Informe o hash do código-fonte.")
         if creation_date_raw:
@@ -248,19 +293,15 @@ async def pi_create(
             errors.append("Informe a data de criação ou a data de publicação.")
 
     if pi_type_enum == PIType.marca:
-        if not marca_nome:
+        if not brand_name:
             errors.append("Informe o nome da marca.")
-        if not marca_tipo:
+        if not brand_type:
             errors.append("Selecione o tipo de marca.")
 
-    if has_partner and not partner_name:
-        errors.append("Informe o nome da instituição parceira.")
-
-    try:
-        primary_pct = float(primary_percentage.replace(",", "."))
-    except ValueError:
-        primary_pct = 0.0
-        errors.append("Sua porcentagem (autor principal) é inválida.")
+    institutions_in, primary_pct, coauthors_clean, part_errors = validate_participation_form(
+        form, user.email, primary_percentage
+    )
+    errors.extend(part_errors)
 
     # ---- Validações do profile do autor principal ----
     required_profile = [
@@ -305,49 +346,6 @@ async def pi_create(
     if not getattr(rg_upload, "filename", None):
         errors.append("Envie o documento do RG (upload).")
 
-    # ---- Validações dos coautores ----
-    coauthors_clean = []
-    seen_emails = {user.email.lower()}
-    total = primary_pct
-    for idx, (nm, em, pc) in enumerate(zip(coauthor_names, coauthor_emails, coauthor_percentages)):
-        nm = (nm or "").strip()
-        em = (em or "").strip().lower()
-        pc = (pc or "").strip().replace(",", ".")
-        inst = (coauthor_institutions[idx] if idx < len(coauthor_institutions) else "ifms").strip() or "ifms"
-        if not nm and not em and not pc:
-            continue
-        if not nm or not em or not pc:
-            errors.append("Coautor com dados incompletos.")
-            continue
-        if em in seen_emails:
-            errors.append(f"Email duplicado: {em}")
-            continue
-        try:
-            pcv = float(pc)
-        except ValueError:
-            errors.append(f"Porcentagem inválida para {em}.")
-            continue
-        seen_emails.add(em)
-        total += pcv
-        coauthors_clean.append({"name": nm, "email": em, "percentage": pcv, "institution": inst})
-
-    if abs(total - 100.0) > 0.01:
-        errors.append(f"A soma das porcentagens deve ser 100% (atual: {total:g}%).")
-
-    partner_pct = sum(
-        c["percentage"] for c in coauthors_clean if c.get("institution") == "partner"
-    )
-    if has_partner and partner_pct <= 0:
-        errors.append(
-            "Com parceria, inclua pelo menos um coautor com instituição "
-            '"Instituição parceira" e distribua as porcentagens entre IFMS e parceiro.'
-        )
-    if not has_partner and partner_pct > 0:
-        errors.append(
-            "Algum coautor está vinculado à instituição parceira; marque "
-            '"Possui instituição parceira" ou altere todos os coautores para IFMS.'
-        )
-
     # ---- Re-render em caso de erro ----
     if errors:
         return templates.TemplateResponse(
@@ -365,40 +363,44 @@ async def pi_create(
                     "programming_language": programming_language,
                     "creation_date": creation_date_raw,
                     "publication_date": publication_date_raw,
-                    "application_field": application_field,
-                    "program_type": program_type,
+                    "application_field_ids": application_field_ids,
+                    "program_type_ids": program_type_ids,
                     "source_hash": source_hash,
                     "is_derived": is_derived,
                     "derived_title": derived_title,
                     "derived_registration": derived_registration,
-                    "marca_nome": marca_nome,
-                    "marca_tipo": marca_tipo,
-                    "marca_idioma_estrangeiro": marca_idioma_estrangeiro,
-                    "marca_termo_estrangeiro": marca_termo_estrangeiro,
-                    "marca_traducao": marca_traducao,
-                    "marca_termos_colidencia": marca_termos_colidencia,
-                    "marca_nice": marca_nice,
-                    "marca_viena": marca_viena,
-                    "marca_protecao_indicada": marca_protecao_indicada,
-                    "marca_protecao_justificativa": marca_protecao_justificativa,
-                    "has_partner": has_partner,
-                    "partner_name": partner_name or "",
-                    "partner_cnpj": partner_cnpj or "",
-                    "partner_contact": partner_contact or "",
+                    "brand_name": brand_name,
+                    "brand_type": brand_type,
+                    "brand_has_foreign_language": brand_has_foreign_language,
+                    "brand_foreign_term": brand_foreign_term,
+                    "brand_translation": brand_translation,
+                    "brand_collision_terms": brand_collision_terms,
+                    "brand_nice_classification": brand_nice_classification,
+                    "brand_vienna_classification": brand_vienna_classification,
+                    "brand_protection_requested": brand_protection_requested,
+                    "brand_protection_justification": brand_protection_justification,
+                    "ifms_institution_percentage": form.get("ifms_institution_percentage") or "100",
                     "primary_percentage": primary_percentage,
+                    "primary_institution_key": form.get("primary_institution_key") or "ifms",
                 },
                 "primary": primary,
                 "accepted_truth": accepted_truth,
                 "accepted_confidentiality": accepted_conf,
                 "coauthors": [
-                    {"name": c["name"], "email": c["email"], "percentage": c["percentage"], "institution": c["institution"]}
+                    {
+                        "name": c["name"],
+                        "email": c["email"],
+                        "percentage": c["percentage"],
+                        "institution_key": c["institution_key"],
+                    }
                     for c in coauthors_clean
-                ] or [
-                    {"name": n, "email": e, "percentage": p, "institution": coauthor_institutions[i] if i < len(coauthor_institutions) else "ifms"}
-                    for i, (n, e, p) in enumerate(zip(coauthor_names, coauthor_emails, coauthor_percentages))
-                    if (n or e or p)
                 ],
+                "partner_institutions": partners_from_form_lists(form),
+                "institution_options": institution_options(
+                    None, partners_from_form_lists(form)
+                ),
                 "edit_mode": False,
+                **_catalog_template_context(db),
             },
             status_code=400,
         )
@@ -408,11 +410,6 @@ async def pi_create(
         title=title,
         type=pi_type_enum,
         description=description or None,
-        has_partner=has_partner,
-        partner_name=partner_name if has_partner else None,
-        partner_cnpj=partner_cnpj if has_partner else None,
-        partner_contact=partner_contact if has_partner else None,
-        partner_percentage=partner_pct if has_partner else None,
         owner_id=user.id,
         status=PIStatus.awaiting_authors,
     )
@@ -422,28 +419,36 @@ async def pi_create(
         pi.programming_language = programming_language or None
         pi.creation_date = creation_date_val
         pi.publication_date = publication_date_val
-        pi.application_field = application_field or None
-        pi.program_type = program_type or None
         pi.source_hash = source_hash or None
         pi.is_derived = is_derived
         pi.derived_title = derived_title or None if is_derived else None
         pi.derived_registration = derived_registration or None if is_derived else None
 
-    # Marca-specific fields
+    # Brand (marca)-specific fields
     if pi_type_enum == PIType.marca:
-        pi.marca_nome = marca_nome or None
-        pi.marca_tipo = marca_tipo or None
-        pi.marca_idioma_estrangeiro = marca_idioma_estrangeiro
-        pi.marca_termo_estrangeiro = marca_termo_estrangeiro or None
-        pi.marca_traducao = marca_traducao or None
-        pi.marca_termos_colidencia = marca_termos_colidencia or None
-        pi.marca_nice = marca_nice or None
-        pi.marca_viena = marca_viena or None
-        pi.marca_protecao_indicada = marca_protecao_indicada
-        pi.marca_protecao_justificativa = marca_protecao_justificativa or None
+        pi.brand_name = brand_name or None
+        pi.brand_type = brand_type or None
+        pi.brand_has_foreign_language = brand_has_foreign_language
+        pi.brand_foreign_term = brand_foreign_term or None
+        pi.brand_translation = brand_translation or None
+        pi.brand_collision_terms = brand_collision_terms or None
+        pi.brand_nice_classification = brand_nice_classification or None
+        pi.brand_vienna_classification = brand_vienna_classification or None
+        pi.brand_protection_requested = brand_protection_requested
+        pi.brand_protection_justification = brand_protection_justification or None
 
     db.add(pi)
     db.flush()
+
+    if pi_type_enum == PIType.software:
+        assign_pi_catalogs(db, pi, application_field_ids, program_type_ids)
+    else:
+        pi.application_fields = []
+        pi.program_types = []
+
+    inst_key_map = save_institutions(db, pi, institutions_in)
+    primary_inst_key = (form.get("primary_institution_key") or "ifms").strip() or "ifms"
+    primary_inst_id = inst_key_map[primary_inst_key].id
 
     # ---- Software uploads (video + source code) ----
     if pi_type_enum == PIType.software:
@@ -464,16 +469,16 @@ async def pi_create(
         if sc_result:
             pi.source_code_path, pi.source_code_original_filename, _ = sc_result
 
-    # ---- Marca image upload ----
+    # ---- Brand (marca) image upload ----
     if pi_type_enum == PIType.marca:
         pi_files_dir = os.path.join(settings.pi_files_storage_dir, f"pi_{pi.id}")
         img_result = await save_flexible_upload(
-            marca_imagem_upload, os.path.join(pi_files_dir, "marca", "imagem"),
+            brand_image_upload, os.path.join(pi_files_dir, "marca", "imagem"),
             max_bytes=10 * 1024 * 1024,
             allowed_exts={"jpg", "jpeg", "png", "gif", "svg", "webp"},
         )
         if img_result:
-            pi.marca_imagem_path, pi.marca_imagem_original_filename, _ = img_result
+            pi.brand_image_path, pi.brand_image_original_filename, _ = img_result
 
     db.flush()
 
@@ -484,7 +489,7 @@ async def pi_create(
         email=user.email.lower(),
         percentage=primary_pct,
         is_primary=True,
-        institution="ifms",
+        institution_id=primary_inst_id,
         status=PIAuthorStatus.completed,
         completed_at=_utcnow(),
     )
@@ -553,24 +558,18 @@ async def pi_create(
         "campus": primary_campus,
     }
     db.add(AuthorProfile(pi_author_id=primary_pa.id, **profile_values))
-    db.add(
-        AuthorDeclaration(
-            pi_author_id=primary_pa.id,
-            accepted_truth=True,
-            accepted_confidentiality=True,
-        )
-    )
 
     # Coautores: pendentes + convite
     pa_to_email: list[PIAuthor] = []
     for c in coauthors_clean:
+        inst_id = inst_key_map[c["institution_key"]].id
         pa = PIAuthor(
             pi_id=pi.id,
             name=c["name"],
             email=c["email"],
             percentage=c["percentage"],
             is_primary=False,
-            institution=c["institution"],
+            institution_id=inst_id,
             status=PIAuthorStatus.pending,
         )
         db.add(pa)
@@ -604,7 +603,10 @@ async def pi_create(
 
     async def _notify_admins():
         from app.services.email import EmailMessage, get_email_service
-        for admin_email in settings.admin_emails_list:
+        from app.database import SessionLocal
+        with SessionLocal() as s:
+            admin_emails = get_admin_emails(s)
+        for admin_email in admin_emails:
             try:
                 html = templates.get_template("emails/admin_new_pi.html").render(
                     pi_title=_pi_title, pi_type=_pi_type_val, pi_id=_pi_id,
@@ -654,6 +656,10 @@ async def pi_show(
             selectinload(PI.authors).selectinload(PIAuthor.personal_documents),
             selectinload(PI.documents),
             selectinload(PI.owner),
+            selectinload(PI.application_fields),
+            selectinload(PI.program_types),
+            selectinload(PI.institutions),
+            selectinload(PI.authors).selectinload(PIAuthor.institution),
         )
         .filter(PI.id == pi_id)
         .first()
@@ -761,8 +767,8 @@ async def pi_source_code_download(
     )
 
 
-@router.get("/pis/{pi_id}/marca-imagem/download", name="pi_marca_imagem_download")
-async def pi_marca_imagem_download(
+@router.get("/pis/{pi_id}/brand-image/download", name="pi_brand_image_download")
+async def pi_brand_image_download(
     pi_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
@@ -772,12 +778,12 @@ async def pi_marca_imagem_download(
         raise HTTPException(status_code=404)
     if not _can_view(user, pi):
         raise HTTPException(status_code=403)
-    if not pi.marca_imagem_path or not os.path.exists(pi.marca_imagem_path):
+    if not pi.brand_image_path or not os.path.exists(pi.brand_image_path):
         raise HTTPException(status_code=404, detail="Arquivo não encontrado")
     return FileResponse(
-        pi.marca_imagem_path,
+        pi.brand_image_path,
         media_type="application/octet-stream",
-        filename=pi.marca_imagem_original_filename or os.path.basename(pi.marca_imagem_path),
+        filename=pi.brand_image_original_filename or os.path.basename(pi.brand_image_path),
     )
 
 
@@ -845,7 +851,11 @@ async def pi_edit_form(
         db.query(PI)
         .options(
             selectinload(PI.authors).selectinload(PIAuthor.profile),
+            selectinload(PI.authors).selectinload(PIAuthor.institution),
             selectinload(PI.owner),
+            selectinload(PI.application_fields),
+            selectinload(PI.program_types),
+            selectinload(PI.institutions),
         )
         .filter(PI.id == pi_id)
         .first()
@@ -871,28 +881,31 @@ async def pi_edit_form(
         "programming_language": pi.programming_language or "",
         "creation_date": pi.creation_date.isoformat() if pi.creation_date else "",
         "publication_date": pi.publication_date.isoformat() if pi.publication_date else "",
-        "application_field": pi.application_field or "",
-        "program_type": pi.program_type or "",
+        "application_field_ids": [f.id for f in pi.application_fields],
+        "program_type_ids": [t.id for t in pi.program_types],
         "source_hash": pi.source_hash or "",
         "is_derived": pi.is_derived,
         "derived_title": pi.derived_title or "",
         "derived_registration": pi.derived_registration or "",
-        "marca_nome": pi.marca_nome or "",
-        "marca_tipo": pi.marca_tipo or "",
-        "marca_idioma_estrangeiro": pi.marca_idioma_estrangeiro or False,
-        "marca_termo_estrangeiro": pi.marca_termo_estrangeiro or "",
-        "marca_traducao": pi.marca_traducao or "",
-        "marca_termos_colidencia": pi.marca_termos_colidencia or "",
-        "marca_nice": pi.marca_nice or "",
-        "marca_viena": pi.marca_viena or "",
-        "marca_protecao_indicada": pi.marca_protecao_indicada or False,
-        "marca_protecao_justificativa": pi.marca_protecao_justificativa or "",
-        "has_partner": pi.has_partner,
-        "partner_name": pi.partner_name or "",
-        "partner_cnpj": pi.partner_cnpj or "",
-        "partner_contact": pi.partner_contact or "",
-        "primary_percentage": str(float(primary_author.percentage)) if primary_author else "",
+        "brand_name": pi.brand_name or "",
+        "brand_type": pi.brand_type or "",
+        "brand_has_foreign_language": pi.brand_has_foreign_language or False,
+        "brand_foreign_term": pi.brand_foreign_term or "",
+        "brand_translation": pi.brand_translation or "",
+        "brand_collision_terms": pi.brand_collision_terms or "",
+        "brand_nice_classification": pi.brand_nice_classification or "",
+        "brand_vienna_classification": pi.brand_vienna_classification or "",
+        "brand_protection_requested": pi.brand_protection_requested or False,
+        "brand_protection_justification": pi.brand_protection_justification or "",
     }
+    inst_slice, _ = institutions_for_template(pi)
+    form_data.update(inst_slice)
+    if primary_author:
+        form_data["primary_percentage"] = str(float(primary_author.percentage))
+        if primary_author.institution and not primary_author.institution.is_ifms:
+            form_data["primary_institution_key"] = f"partner-{primary_author.institution_id}"
+        else:
+            form_data["primary_institution_key"] = "ifms"
 
     primary_data = _empty_primary()
     if profile:
@@ -916,12 +929,17 @@ async def pi_edit_form(
             "campus": profile.campus or "",
         }
 
+    _, partner_rows = institutions_for_template(pi)
     coauthors = [
         {
             "name": a.name,
             "email": a.email,
             "percentage": str(float(a.percentage)),
-            "institution": a.institution or "ifms",
+            "institution_key": (
+                f"partner-{a.institution_id}"
+                if a.institution and not a.institution.is_ifms
+                else "ifms"
+            ),
         }
         for a in pi.authors if not a.is_primary
     ]
@@ -937,11 +955,14 @@ async def pi_edit_form(
             "form": form_data,
             "primary": primary_data,
             "coauthors": coauthors,
+            "partner_institutions": partner_rows,
+            "institution_options": institution_options(pi, partner_rows),
             "accepted_truth": True,
             "accepted_confidentiality": True,
             "edit_mode": True,
             "pi_id": pi.id,
             "admin_notes": pi.admin_notes or "",
+            **_catalog_template_context(db),
         },
     )
 
@@ -958,7 +979,9 @@ async def pi_edit_submit(
         db.query(PI)
         .options(
             selectinload(PI.authors).selectinload(PIAuthor.profile),
+            selectinload(PI.authors).selectinload(PIAuthor.institution),
             selectinload(PI.documents),
+            selectinload(PI.institutions),
         )
         .filter(PI.id == pi_id)
         .first()
@@ -984,32 +1007,28 @@ async def pi_edit_submit(
     programming_language = (form.get("programming_language") or "").strip()
     creation_date_raw = (form.get("creation_date") or "").strip()
     publication_date_raw = (form.get("publication_date") or "").strip()
-    application_field = (form.get("application_field") or "").strip()
-    program_type = (form.get("program_type") or "").strip()
+    application_field_ids = parse_ids_from_form(form, "application_field_ids")
+    program_type_ids = parse_ids_from_form(form, "program_type_ids")
     source_hash = (form.get("source_hash") or "").strip()
     is_derived = form.get("is_derived") in ("on", "true", "1")
     derived_title = (form.get("derived_title") or "").strip()
     derived_registration = (form.get("derived_registration") or "").strip()
 
-    marca_nome = (form.get("marca_nome") or "").strip()
-    marca_tipo = (form.get("marca_tipo") or "").strip()
-    marca_idioma_estrangeiro = form.get("marca_idioma_estrangeiro") in ("on", "true", "1")
-    marca_termo_estrangeiro = (form.get("marca_termo_estrangeiro") or "").strip()
-    marca_traducao = (form.get("marca_traducao") or "").strip()
-    marca_termos_colidencia = (form.get("marca_termos_colidencia") or "").strip()
-    marca_nice = (form.get("marca_nice") or "").strip()
-    marca_viena = (form.get("marca_viena") or "").strip()
-    marca_protecao_indicada = form.get("marca_protecao_indicada") in ("on", "true", "1")
-    marca_protecao_justificativa = (form.get("marca_protecao_justificativa") or "").strip()
+    brand_name = (form.get("brand_name") or "").strip()
+    brand_type = (form.get("brand_type") or "").strip()
+    brand_has_foreign_language = form.get("brand_has_foreign_language") in ("on", "true", "1")
+    brand_foreign_term = (form.get("brand_foreign_term") or "").strip()
+    brand_translation = (form.get("brand_translation") or "").strip()
+    brand_collision_terms = (form.get("brand_collision_terms") or "").strip()
+    brand_nice_classification = (form.get("brand_nice_classification") or "").strip()
+    brand_vienna_classification = (form.get("brand_vienna_classification") or "").strip()
+    brand_protection_requested = form.get("brand_protection_requested") in ("on", "true", "1")
+    brand_protection_justification = (form.get("brand_protection_justification") or "").strip()
 
     video_upload = form.get("video_file")
     source_code_upload = form.get("source_code_file")
-    marca_imagem_upload = form.get("marca_imagem_file")
+    brand_image_upload = form.get("brand_image_file")
 
-    has_partner = form.get("has_partner") in ("on", "true", "1")
-    partner_name = (form.get("partner_name") or "").strip() or None
-    partner_cnpj = (form.get("partner_cnpj") or "").strip() or None
-    partner_contact = (form.get("partner_contact") or "").strip() or None
     primary_percentage = (form.get("primary_percentage") or "").strip()
 
     primary = {
@@ -1048,10 +1067,10 @@ async def pi_edit_submit(
     if pi_type_enum == PIType.software:
         if not programming_language:
             errors.append("Informe a linguagem de programação.")
-        if not application_field:
-            errors.append("Informe o campo de aplicação.")
-        if not program_type:
-            errors.append("Informe o tipo de programa.")
+        if not application_field_ids:
+            errors.append("Selecione pelo menos um campo de aplicação.")
+        if not program_type_ids:
+            errors.append("Selecione pelo menos um tipo de programa.")
         if not source_hash:
             errors.append("Informe o hash do código-fonte.")
         if creation_date_raw:
@@ -1068,16 +1087,15 @@ async def pi_edit_submit(
             errors.append("Informe a data de criação ou a data de publicação.")
 
     if pi_type_enum == PIType.marca:
-        if not marca_nome:
+        if not brand_name:
             errors.append("Informe o nome da marca.")
-        if not marca_tipo:
+        if not brand_type:
             errors.append("Selecione o tipo de marca.")
 
-    try:
-        primary_pct = float(primary_percentage.replace(",", "."))
-    except ValueError:
-        primary_pct = 0.0
-        errors.append("Sua porcentagem (autor principal) é inválida.")
+    institutions_in, primary_pct, coauthors_clean, part_errors = validate_participation_form(
+        form, user.email, primary_percentage
+    )
+    errors.extend(part_errors)
 
     primary_bond = None
     if primary["ifms_bond"]:
@@ -1095,10 +1113,6 @@ async def pi_edit_submit(
 
     if errors:
         logger.warning("Validação falhou ao editar PI %s: %s", pi_id, errors)
-        coauthor_names = form.getlist("coauthor_name")
-        coauthor_emails = form.getlist("coauthor_email")
-        coauthor_percentages = form.getlist("coauthor_percentage")
-        coauthor_institutions = form.getlist("coauthor_institution")
         return templates.TemplateResponse(
             request, "pi/new.html",
             {
@@ -1111,66 +1125,78 @@ async def pi_edit_submit(
                     "title": title, "type": pi_type, "description": description,
                     "programming_language": programming_language,
                     "creation_date": creation_date_raw, "publication_date": publication_date_raw,
-                    "application_field": application_field, "program_type": program_type,
+                    "application_field_ids": application_field_ids,
+                    "program_type_ids": program_type_ids,
                     "source_hash": source_hash, "is_derived": is_derived,
                     "derived_title": derived_title, "derived_registration": derived_registration,
-                    "marca_nome": marca_nome, "marca_tipo": marca_tipo,
-                    "marca_idioma_estrangeiro": marca_idioma_estrangeiro,
-                    "marca_termo_estrangeiro": marca_termo_estrangeiro,
-                    "marca_traducao": marca_traducao, "marca_termos_colidencia": marca_termos_colidencia,
-                    "marca_nice": marca_nice, "marca_viena": marca_viena,
-                    "marca_protecao_indicada": marca_protecao_indicada,
-                    "marca_protecao_justificativa": marca_protecao_justificativa,
-                    "has_partner": has_partner, "partner_name": partner_name or "",
-                    "partner_cnpj": partner_cnpj or "", "partner_contact": partner_contact or "",
+                    "brand_name": brand_name, "brand_type": brand_type,
+                    "brand_has_foreign_language": brand_has_foreign_language,
+                    "brand_foreign_term": brand_foreign_term,
+                    "brand_translation": brand_translation, "brand_collision_terms": brand_collision_terms,
+                    "brand_nice_classification": brand_nice_classification,
+                    "brand_vienna_classification": brand_vienna_classification,
+                    "brand_protection_requested": brand_protection_requested,
+                    "brand_protection_justification": brand_protection_justification,
+                    "ifms_institution_percentage": form.get("ifms_institution_percentage") or "100",
                     "primary_percentage": primary_percentage,
+                    "primary_institution_key": form.get("primary_institution_key") or "ifms",
                 },
                 "primary": primary,
                 "accepted_truth": True,
                 "accepted_confidentiality": True,
                 "coauthors": [
-                    {"name": n, "email": e, "percentage": p, "institution": coauthor_institutions[i] if i < len(coauthor_institutions) else "ifms"}
-                    for i, (n, e, p) in enumerate(zip(coauthor_names, coauthor_emails, coauthor_percentages))
-                    if (n or e or p)
+                    {
+                        "name": c["name"],
+                        "email": c["email"],
+                        "percentage": c["percentage"],
+                        "institution_key": c["institution_key"],
+                    }
+                    for c in coauthors_clean
                 ],
+                "partner_institutions": partners_from_form_lists(form),
+                "institution_options": institution_options(
+                    None, partners_from_form_lists(form)
+                ),
                 "edit_mode": True,
                 "pi_id": pi_id,
                 "admin_notes": pi.admin_notes or "",
+                **_catalog_template_context(db),
             },
             status_code=400,
         )
+
+    inst_key_map = replace_institutions(db, pi, institutions_in)
+    primary_inst_key = (form.get("primary_institution_key") or "ifms").strip() or "ifms"
 
     # Update PI fields
     pi.title = title
     pi.type = pi_type_enum
     pi.description = description or None
-    pi.has_partner = has_partner
-    pi.partner_name = partner_name if has_partner else None
-    pi.partner_cnpj = partner_cnpj if has_partner else None
-    pi.partner_contact = partner_contact if has_partner else None
 
     if pi_type_enum == PIType.software:
         pi.programming_language = programming_language or None
         pi.creation_date = creation_date_val
         pi.publication_date = publication_date_val
-        pi.application_field = application_field or None
-        pi.program_type = program_type or None
         pi.source_hash = source_hash or None
         pi.is_derived = is_derived
         pi.derived_title = derived_title or None if is_derived else None
         pi.derived_registration = derived_registration or None if is_derived else None
+        assign_pi_catalogs(db, pi, application_field_ids, program_type_ids)
+    else:
+        pi.application_fields = []
+        pi.program_types = []
 
     if pi_type_enum == PIType.marca:
-        pi.marca_nome = marca_nome or None
-        pi.marca_tipo = marca_tipo or None
-        pi.marca_idioma_estrangeiro = marca_idioma_estrangeiro
-        pi.marca_termo_estrangeiro = marca_termo_estrangeiro or None
-        pi.marca_traducao = marca_traducao or None
-        pi.marca_termos_colidencia = marca_termos_colidencia or None
-        pi.marca_nice = marca_nice or None
-        pi.marca_viena = marca_viena or None
-        pi.marca_protecao_indicada = marca_protecao_indicada
-        pi.marca_protecao_justificativa = marca_protecao_justificativa or None
+        pi.brand_name = brand_name or None
+        pi.brand_type = brand_type or None
+        pi.brand_has_foreign_language = brand_has_foreign_language
+        pi.brand_foreign_term = brand_foreign_term or None
+        pi.brand_translation = brand_translation or None
+        pi.brand_collision_terms = brand_collision_terms or None
+        pi.brand_nice_classification = brand_nice_classification or None
+        pi.brand_vienna_classification = brand_vienna_classification or None
+        pi.brand_protection_requested = brand_protection_requested
+        pi.brand_protection_justification = brand_protection_justification or None
 
     # Handle file uploads (optional re-uploads during edit)
     pi_files_dir = os.path.join(settings.pi_files_storage_dir, f"pi_{pi.id}")
@@ -1193,17 +1219,18 @@ async def pi_edit_submit(
 
     if pi_type_enum == PIType.marca:
         img_result = await save_flexible_upload(
-            marca_imagem_upload, os.path.join(pi_files_dir, "marca", "imagem"),
+            brand_image_upload, os.path.join(pi_files_dir, "marca", "imagem"),
             max_bytes=10 * 1024 * 1024,
             allowed_exts={"jpg", "jpeg", "png", "gif", "svg", "webp"},
         )
         if img_result:
-            pi.marca_imagem_path, pi.marca_imagem_original_filename, _ = img_result
+            pi.brand_image_path, pi.brand_image_original_filename, _ = img_result
 
     # Update primary author profile
     primary_author = next((a for a in pi.authors if a.is_primary), None)
     if primary_author:
         primary_author.percentage = primary_pct
+        primary_author.institution_id = inst_key_map[primary_inst_key].id
         if primary_author.profile:
             profile = primary_author.profile
             profile.cpf = primary["cpf"]
@@ -1223,6 +1250,13 @@ async def pi_edit_submit(
             profile.ifms_bond = primary_bond
             profile.ifms_bond_other = primary["ifms_bond_other"] if primary_bond == IfmsBond.outros else None
             profile.campus = primary["campus"] if primary_bond != IfmsBond.outros else None
+
+    coauthor_by_email = {a.email.lower(): a for a in pi.authors if not a.is_primary}
+    for c in coauthors_clean:
+        pa = coauthor_by_email.get(c["email"])
+        if pa:
+            pa.percentage = c["percentage"]
+            pa.institution_id = inst_key_map[c["institution_key"]].id
 
     # Clear admin notes and transition to awaiting_signatures
     pi.admin_notes = None
@@ -1255,7 +1289,10 @@ async def pi_edit_submit(
 
     async def _notify_admins():
         from app.services.email import EmailMessage, get_email_service
-        for admin_email in settings.admin_emails_list:
+        from app.database import SessionLocal
+        with SessionLocal() as s:
+            admin_emails = get_admin_emails(s)
+        for admin_email in admin_emails:
             try:
                 html = templates.get_template("emails/admin_new_pi.html").render(
                     pi_title=_pi_title, pi_type=_pi_type_val, pi_id=_pi_id,

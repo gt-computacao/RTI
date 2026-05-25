@@ -1,0 +1,33 @@
+{% set p = p|default({"key": "", "name": "", "percentage": "", "cnpj": "", "contact": ""}) %}
+<div class="partner-institution-row coauthor-row" data-institution-key="{{ p.key }}">
+  <input type="hidden" name="partner_institution_key" value="{{ p.key }}" />
+  <div class="form-grid-2">
+    <div class="form-row">
+      <label>Nome da instituição *</label>
+      <input type="text" name="partner_institution_name" value="{{ p.name }}" required
+             class="partner-institution-name" />
+    </div>
+    <div class="form-row">
+      <label>% titularidade na PI *</label>
+      <input type="number" name="partner_institution_percentage" value="{{ p.percentage }}"
+             min="0.01" max="100" step="0.01" required inputmode="decimal"
+             class="institution-percentage-input" />
+    </div>
+  </div>
+  <div class="form-grid-2">
+    <div class="form-row">
+      <label>CNPJ</label>
+      <input type="text" name="partner_institution_cnpj" value="{{ p.cnpj }}"
+             inputmode="numeric" maxlength="18" data-mask="cnpj"
+             placeholder="00.000.000/0000-00" />
+    </div>
+    <div class="form-row">
+      <label>Contato</label>
+      <input type="text" name="partner_institution_contact" value="{{ p.contact }}" />
+    </div>
+  </div>
+  <button type="button" class="btn btn-danger btn-sm partner-remove-btn"
+          onclick="removePartnerInstitution(this)">
+    Remover instituição
+  </button>
+</div>

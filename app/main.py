@@ -10,6 +10,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
+from app.database import SessionLocal
+from app.models import User, UserRole
 from app.routers import admin as admin_router
 from app.routers import auth as auth_router
 from app.routers import dashboard as dashboard_router
@@ -33,6 +35,33 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
+    static_dir = Path(__file__).resolve().parent / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.middleware("http")
+    async def add_user_to_request(request: Request, call_next):
+        request.state.user = None
+        request.state.is_admin = False
+        try:
+            user_id = request.session.get("user_id")
+        except (AssertionError, AttributeError):
+            user_id = None
+        if user_id:
+            db = SessionLocal()
+            try:
+                user = db.get(User, user_id)
+                if user:
+                    request.state.user = user
+                    request.state.is_admin = user.role == UserRole.admin
+            finally:
+                db.close()
+        response = await call_next(request)
+        return response
+
+    # IMPORTANTE: SessionMiddleware precisa ser adicionado por ÚLTIMO para
+    # ficar como middleware mais externo. Assim ele injeta `request.session`
+    # ANTES do `add_user_to_request` tentar lê-lo.
     app.add_middleware(
         SessionMiddleware,
         secret_key=settings.secret_key,
@@ -41,16 +70,6 @@ def create_app() -> FastAPI:
         https_only=False,
         max_age=60 * 60 * 24 * 7,
     )
-
-    static_dir = Path(__file__).resolve().parent / "static"
-    static_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-
-    @app.middleware("http")
-    async def add_user_to_request(request: Request, call_next):
-        request.state.user = None
-        response = await call_next(request)
-        return response
 
     app.include_router(auth_router.router)
     app.include_router(dashboard_router.router)

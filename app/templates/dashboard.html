@@ -21,14 +21,99 @@
   </div>
 </div>
 
+<div class="stats-grid">
+  <a href="/dashboard" class="stat-card">
+    <span class="stat-value">{{ stats.total }}</span>
+    <span class="stat-label">Total de PIs</span>
+  </a>
+  <a href="/dashboard?status=awaiting_authors" class="stat-card">
+    <span class="stat-value">{{ stats.awaiting_authors }}</span>
+    <span class="stat-label">Aguardando coautores</span>
+  </a>
+  <a href="/dashboard?status=awaiting_signatures" class="stat-card">
+    <span class="stat-value">{{ stats.awaiting_signatures }}</span>
+    <span class="stat-label">Aguardando assinaturas</span>
+  </a>
+  <a href="/dashboard?status=awaiting_corrections" class="stat-card">
+    <span class="stat-value">{{ stats.awaiting_corrections }}</span>
+    <span class="stat-label">Aguardando correções</span>
+  </a>
+  <a href="/dashboard?status=completed" class="stat-card">
+    <span class="stat-value">{{ stats.completed }}</span>
+    <span class="stat-label">Concluídas</span>
+  </a>
+  <a href="/dashboard?scope=action_needed" class="stat-card stat-card-warn">
+    <span class="stat-value">!</span>
+    <span class="stat-label">Precisam de ação</span>
+  </a>
+  <a href="/dashboard" class="stat-card">
+    <span class="stat-value">{{ stats.recent_30d }}</span>
+    <span class="stat-label">Últimos 30 dias</span>
+  </a>
+  {% if is_admin and stats.unread_notifications is defined %}
+    <a href="/admin" class="stat-card stat-card-info">
+      <span class="stat-value">{{ stats.unread_notifications }}</span>
+      <span class="stat-label">Notificações não lidas</span>
+    </a>
+  {% endif %}
+</div>
+
+{% if stats.total > 0 %}
+<section class="card mt-2">
+  <form method="get" action="/dashboard" class="filters-bar">
+    <input type="search" name="q" class="input" placeholder="Buscar por título..."
+           value="{{ q_filter }}" style="min-width:200px;" />
+    <select name="status" class="input">
+      <option value="">Todos os status</option>
+      {% for k, v in status_labels.items() %}
+        {% if k != "pending" %}
+          <option value="{{ k }}" {% if status_filter == k %}selected{% endif %}>{{ v }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+    <select name="type" class="input">
+      <option value="">Todos os tipos</option>
+      {% for k, v in pi_type_labels.items() %}
+        <option value="{{ k }}" {% if type_filter == k %}selected{% endif %}>{{ v }}</option>
+      {% endfor %}
+    </select>
+    {% if is_admin %}
+      <select name="campus" class="input">
+        <option value="">Todos os campus</option>
+        {% for c in campuses %}
+          <option value="{{ c }}" {% if campus_filter == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    {% endif %}
+    <select name="scope" class="input">
+      <option value="">Todos</option>
+      <option value="action_needed" {% if scope_filter == 'action_needed' %}selected{% endif %}>Precisam de ação</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Filtrar</button>
+    {% if has_filters %}
+      <a href="/dashboard" class="btn btn-ghost">Limpar</a>
+    {% endif %}
+  </form>
+  <p class="muted small" style="margin-top: 8px;">
+    {{ result_count }} resultado(s)
+    {% if has_filters %} com filtros aplicados{% endif %}
+  </p>
+</section>
+{% endif %}
+
 {% if not pis %}
   <div class="empty-state">
-    <h2>Nenhuma Propriedade Intelectual cadastrada ainda</h2>
-    <p class="muted">Comece criando sua primeira Propriedade Intelectual.</p>
-    <a href="/pis/new" class="btn btn-primary">Criar minha primeira Propriedade Intelectual</a>
+    {% if has_filters %}
+      <h2>Nenhuma PI encontrada</h2>
+      <p class="muted">Tente outros filtros ou <a href="/dashboard">limpar a busca</a>.</p>
+    {% else %}
+      <h2>Nenhuma Propriedade Intelectual cadastrada ainda</h2>
+      <p class="muted">Comece criando sua primeira Propriedade Intelectual.</p>
+      <a href="/pis/new" class="btn btn-primary">Criar minha primeira Propriedade Intelectual</a>
+    {% endif %}
   </div>
 {% else %}
-  <div class="cards-grid">
+  <div class="cards-grid mt-2">
     {% for pi in pis %}
       {% set total = pi.authors|length %}
       {% set done = pi.authors|selectattr("status.value", "equalto", "completed")|list|length %}
@@ -40,7 +125,7 @@
         <h3>{{ pi.title }}</h3>
         <div class="pi-meta">
           <span class="chip">{{ pi.type|pi_type_label }}</span>
-          {% if pi.has_partner %}
+          {% if has_external_partners(pi) %}
             <span class="chip chip-info">Com parceria</span>
           {% endif %}
         </div>

@@ -37,3 +37,14 @@ def require_admin(
     if user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas admin")
     return user
+
+
+def home_url_for(user: Optional[User]) -> str:
+    """Para onde redirecionar um usuário logado por padrão.
+
+    Admins não criam PIs — vão direto para o painel admin. Autores vão para o
+    dashboard.
+    """
+    if user and user.role == UserRole.admin:
+        return "/admin"
+    return "/dashboard"

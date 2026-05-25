@@ -10,16 +10,22 @@
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
 </head>
 <body>
+  {% set _is_admin = request.state.is_admin if request.state and request.state.is_admin else False %}
+  {% set _home_url = "/admin" if _is_admin else "/dashboard" %}
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="brand" href="/dashboard">
+      <a class="brand" href="{{ _home_url }}">
         <img class="brand-logo" src="/static/images/if-logo.png" width="40" height="40" alt="Instituto Federal" />
         <span class="brand-text">Registro de Propriedade Intelectual</span>
       </a>
       <nav class="topnav">
         {% if request.session.get("user_id") %}
-          <a href="/dashboard">Dashboard</a>
-          <a href="/pis/new">Nova PI</a>
+          {% if _is_admin %}
+            <a href="/admin">Painel Admin</a>
+          {% else %}
+            <a href="/dashboard">Dashboard</a>
+            <a href="/pis/new">Nova PI</a>
+          {% endif %}
           <a href="/logout" class="muted">Sair</a>
         {% else %}
           <a href="/login">Entrar</a>

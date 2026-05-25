@@ -38,8 +38,12 @@ def _load_pi(db: Session, pi_id: int) -> PI:
         db.query(PI)
         .options(
             selectinload(PI.authors).selectinload(PIAuthor.profile),
+            selectinload(PI.authors).selectinload(PIAuthor.institution),
             selectinload(PI.documents),
             selectinload(PI.owner),
+            selectinload(PI.application_fields),
+            selectinload(PI.program_types),
+            selectinload(PI.institutions),
         )
         .filter(PI.id == pi_id)
         .first()

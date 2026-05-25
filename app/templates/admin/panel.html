@@ -7,14 +7,58 @@
     <h1>Painel Administrativo</h1>
     <p class="muted">Gerenciamento de Propriedades Intelectuais</p>
   </div>
-  <div>
-    <a href="/dashboard" class="btn btn-ghost">← Dashboard</a>
+  <div class="actions">
+    <a href="/admin/catalogs" class="btn btn-ghost">Gerenciar catálogos</a>
   </div>
 </div>
 
+{% if admin_msg %}
+  <div class="alert alert-success">{{ admin_msg }}</div>
+{% endif %}
+{% if admin_error %}
+  <div class="alert alert-error">{{ admin_error }}</div>
+{% endif %}
+
+{# Administrators #}
+<section class="card mt-2">
+  <h2>Administradores</h2>
+  <form method="post" action="/admin/admins" class="filters-bar admin-form">
+    <input type="email" name="email" class="input" placeholder="email@ifms.edu.br" required />
+    <input type="text" name="name" class="input" placeholder="Nome (opcional)" />
+    <button type="submit" class="btn btn-primary">Adicionar administrador</button>
+  </form>
+  {% if admins %}
+    <table class="data-table">
+      <thead>
+        <tr><th>Nome</th><th>Email</th><th>Ações</th></tr>
+      </thead>
+      <tbody>
+        {% for a in admins %}
+          <tr>
+            <td>{{ a.name }}</td>
+            <td>{{ a.email }}</td>
+            <td>
+              {% if a.id != user.id %}
+                <form method="post" action="/admin/admins/{{ a.id }}/revoke" class="inline-form"
+                      onsubmit="return confirm('Remover privilégios de admin deste usuário?');">
+                  <button type="submit" class="btn btn-ghost btn-sm btn-danger">Remover admin</button>
+                </form>
+              {% else %}
+                <span class="muted small">você</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nenhum administrador cadastrado.</p>
+  {% endif %}
+</section>
+
 {# Notifications Section #}
 <section class="card mt-2">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
+  <div class="section-head">
     <h2>
       Notificações
       {% if unread_count > 0 %}
@@ -32,11 +76,11 @@
   </div>
 
   {% if notifications %}
-    <div class="notif-list" style="max-height:200px; overflow-y:auto;">
+    <div class="notif-list">
       {% for n in notifications %}
-        <div class="notif-item {% if not n.is_read %}notif-unread{% endif %}" style="padding:6px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div class="notif-item {% if not n.is_read %}notif-unread{% endif %}">
           <div>
-            <span class="small">{{ n.created_at|fdatetime_ms }}</span>
+            <span class="small muted">{{ n.created_at|fdatetime_ms }}</span>
             —
             <a href="/pis/{{ n.pi_id }}">{{ n.message or "Nova notificação" }}</a>
           </div>
@@ -58,14 +102,14 @@
 {# Filters #}
 <section class="card mt-2">
   <h2>Propriedades Intelectuais</h2>
-  <form method="get" action="/admin" style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-    <select name="campus" class="input" style="max-width:200px;">
+  <form method="get" action="/admin" class="filters-bar admin-filters">
+    <select name="campus" class="input">
       <option value="">Todos os campus</option>
       {% for c in campuses %}
         <option value="{{ c }}" {% if campus_filter == c %}selected{% endif %}>{{ c }}</option>
       {% endfor %}
     </select>
-    <select name="status" class="input" style="max-width:200px;">
+    <select name="status" class="input">
       <option value="">Todos os status</option>
       {% for k, v in status_labels.items() %}
         {% if k != "pending" %}
@@ -106,14 +150,14 @@
             <td>{{ pi.owner.name }}<br><span class="muted small">{{ pi.owner.email }}</span></td>
             <td>{{ pi.created_at|fdatetime_ms }}</td>
             <td>
-              <div style="display:flex; gap:4px; flex-wrap:wrap;">
+              <div class="row-actions">
                 {% if pi.status.value in ("completed", "awaiting_signatures") %}
                   <button class="btn btn-ghost btn-sm"
                           onclick="document.getElementById('correction-modal-{{ pi.id }}').showModal()">
                     Devolver
                   </button>
                 {% endif %}
-                <button class="btn btn-ghost btn-sm" style="color:var(--danger);"
+                <button class="btn btn-ghost btn-sm btn-danger"
                         hx-post="/admin/pis/{{ pi.id }}/delete"
                         hx-target="#pi-row-{{ pi.id }}"
                         hx-swap="outerHTML"
@@ -124,13 +168,13 @@
 
               {# Correction modal #}
               {% if pi.status.value in ("completed", "awaiting_signatures") %}
-                <dialog id="correction-modal-{{ pi.id }}" style="padding:20px; border-radius:8px; border:1px solid var(--border); max-width:500px;">
-                  <form method="post" action="/admin/pis/{{ pi.id }}/return-for-correction">
+                <dialog id="correction-modal-{{ pi.id }}" class="modal">
+                  <form method="post" action="/admin/pis/{{ pi.id }}/return-for-correction" class="modal-form">
                     <h3>Devolver para correção</h3>
                     <p class="muted">PI: {{ pi.title }}</p>
                     <label for="admin_notes_{{ pi.id }}">Observações para o autor:</label>
-                    <textarea name="admin_notes" id="admin_notes_{{ pi.id }}" class="input" rows="4" style="width:100%; margin-top:8px;"></textarea>
-                    <div style="margin-top:12px; display:flex; gap:8px; justify-content:flex-end;">
+                    <textarea name="admin_notes" id="admin_notes_{{ pi.id }}" class="input" rows="4"></textarea>
+                    <div class="modal-actions">
                       <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancelar</button>
                       <button type="submit" class="btn btn-primary">Devolver para correção</button>
                     </div>

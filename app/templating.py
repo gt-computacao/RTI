@@ -451,6 +451,26 @@ def pi_type_label(value: Any) -> str:
     return PI_TYPE_LABELS.get(key, key)
 
 
+def within_institution_percent_filter(author, pi) -> float:
+    from app.services.participation import within_institution_percent
+
+    peers = pi.authors or []
+    return within_institution_percent(author, peers)
+
+
+templates.env.filters["within_institution_percent"] = within_institution_percent_filter
+
+
+def authors_for_institution(pi, institution) -> list:
+    return [a for a in (pi.authors or []) if a.institution_id == institution.id]
+
+
+def has_external_partners_global(pi) -> bool:
+    from app.services.participation import has_external_partners
+
+    return has_external_partners(pi)
+
+
 def ifms_bond_label(value: Any) -> str:
     if value is None:
         return ""
@@ -466,6 +486,9 @@ templates.env.filters["fpercent"] = format_percent
 templates.env.filters["status_label"] = status_label
 templates.env.filters["pi_type_label"] = pi_type_label
 templates.env.filters["ifms_bond_label"] = ifms_bond_label
+templates.env.filters["within_institution_percent"] = within_institution_percent_filter
+templates.env.globals["authors_for_institution"] = authors_for_institution
+templates.env.globals["has_external_partners"] = has_external_partners_global
 
 templates.env.globals["PI_TYPE_LABELS"] = PI_TYPE_LABELS
 templates.env.globals["IFMS_BOND_LABELS"] = IFMS_BOND_LABELS

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Catálogos · Admin{% endblock %}
+{% block content %}
+
+<style>
+  .tabs-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 0;
+  }
+  .tabs-bar .btn[aria-selected="true"] {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+  .tab-panel[hidden] {
+    display: none;
+  }
+</style>
+
+<div class="page-head">
+  <div>
+    <h1>Catálogos</h1>
+    <p class="muted">Campos de aplicação e tipos de programa</p>
+  </div>
+  <div class="actions">
+    <a href="/admin" class="btn btn-ghost">Voltar ao painel</a>
+  </div>
+</div>
+
+{% if catalog_msg %}
+  <div class="alert alert-success">{{ catalog_msg }}</div>
+{% endif %}
+{% if catalog_error %}
+  <div class="alert alert-error">{{ catalog_error }}</div>
+{% endif %}
+
+<div class="card mt-2 tabs-bar" role="tablist">
+  <button type="button" class="btn btn-ghost" role="tab"
+          aria-controls="tab-application-fields"
+          data-tab-target="application-fields">
+    Campos de aplicação <span class="muted small">({{ application_fields|length }})</span>
+  </button>
+  <button type="button" class="btn btn-ghost" role="tab"
+          aria-controls="tab-program-types"
+          data-tab-target="program-types">
+    Tipos de programa <span class="muted small">({{ program_types|length }})</span>
+  </button>
+</div>
+
+{% macro catalog_section(title, kind, items, usage) %}
+  <section class="card mt-2 tab-panel" id="tab-{{ kind }}" role="tabpanel" hidden>
+    <div class="section-head">
+      <h2>{{ title }} <span class="muted small">({{ items|length }})</span></h2>
+    </div>
+
+    <form method="post" action="/admin/{{ kind }}/create" class="filters-bar admin-form">
+      <input type="text" name="code" class="input" maxlength="10" placeholder="Código (ex.: AD01)" required />
+      <input type="text" name="label" class="input" maxlength="500" placeholder="Rótulo (ex.: AD01 - Administração ...)" required />
+      <button type="submit" class="btn btn-primary">Adicionar</button>
+    </form>
+
+    {% if items %}
+      <div class="filters-bar mt-2">
+        <input type="search" class="input"
+               placeholder="Filtrar por código ou rótulo..."
+               oninput="filterCatalog(this, '{{ kind }}-table')" />
+      </div>
+
+      <table class="data-table" id="{{ kind }}-table">
+        <thead>
+          <tr>
+            <th style="width:120px">Código</th>
+            <th>Rótulo</th>
+            <th style="width:80px">Usos</th>
+            <th style="width:200px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            {% set used = usage.get(item.id, 0) %}
+            <tr>
+              <td><code>{{ item.code }}</code></td>
+              <td>{{ item.label }}</td>
+              <td>
+                {% if used > 0 %}
+                  <span class="badge badge-pending">{{ used }}</span>
+                {% else %}
+                  <span class="muted">0</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button type="button"
+                          class="btn btn-ghost btn-sm"
+                          onclick="document.getElementById('edit-{{ kind }}-{{ item.id }}').showModal()">
+                    Editar
+                  </button>
+                  <form method="post" action="/admin/{{ kind }}/{{ item.id }}/delete" class="inline-form"
+                        onsubmit="return confirm('Remover o item {{ item.code }}?{% if used %}\n\nEle está em uso em {{ used }} PI(s). Os vínculos serão removidos.{% endif %}');">
+                    <button type="submit" class="btn btn-ghost btn-sm btn-danger">Remover</button>
+                  </form>
+                </div>
+
+                <dialog id="edit-{{ kind }}-{{ item.id }}" class="modal">
+                  <form method="post" action="/admin/{{ kind }}/{{ item.id }}/update" class="modal-form">
+                    <h3>Editar item</h3>
+                    <p class="muted small">{{ title }}</p>
+
+                    <label for="code-{{ kind }}-{{ item.id }}">Código</label>
+                    <input id="code-{{ kind }}-{{ item.id }}" type="text" name="code" maxlength="10"
+                           class="input" value="{{ item.code }}" required />
+
+                    <label for="label-{{ kind }}-{{ item.id }}">Rótulo</label>
+                    <input id="label-{{ kind }}-{{ item.id }}" type="text" name="label" maxlength="500"
+                           class="input" value="{{ item.label }}" required />
+
+                    <div class="modal-actions">
+                      <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">Salvar</button>
+                    </div>
+                  </form>
+                </dialog>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Nenhum item cadastrado.</p>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{{ catalog_section("Campos de aplicação", "application-fields", application_fields, application_field_usage) }}
+{{ catalog_section("Tipos de programa", "program-types", program_types, program_type_usage) }}
+
+<script>
+  function filterCatalog(input, tableId) {
+    const q = input.value.trim().toLowerCase();
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    for (const tr of table.tBodies[0].rows) {
+      const txt = (tr.cells[0].textContent + " " + tr.cells[1].textContent).toLowerCase();
+      tr.style.display = !q || txt.includes(q) ? "" : "none";
+    }
+  }
+
+  (function () {
+    const tabs = document.querySelectorAll('[data-tab-target]');
+    const panels = document.querySelectorAll('.tab-panel');
+    const validKinds = Array.from(tabs).map(t => t.dataset.tabTarget);
+    const defaultKind = validKinds[0];
+
+    function activate(kind, updateHash) {
+      if (!validKinds.includes(kind)) kind = defaultKind;
+      tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.tabTarget === kind ? 'true' : 'false'));
+      panels.forEach(p => {
+        const isActive = p.id === 'tab-' + kind;
+        p.hidden = !isActive;
+      });
+      if (updateHash) {
+        history.replaceState(null, '', '#' + kind);
+      }
+    }
+
+    tabs.forEach(t => t.addEventListener('click', () => activate(t.dataset.tabTarget, true)));
+    window.addEventListener('hashchange', () => activate(location.hash.slice(1), false));
+
+    const queryTab = new URLSearchParams(location.search).get('tab');
+    activate(queryTab || location.hash.slice(1) || defaultKind, false);
+  })();
+</script>
+
+{% endblock %}

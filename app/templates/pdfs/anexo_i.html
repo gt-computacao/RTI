@@ -23,19 +23,25 @@
   </tr>
   <tr>
     <td colspan="2">
-      <strong>Campo de Aplicação:</strong> {{ pi.application_field or '' }}
+      <strong>Campos de Aplicação:</strong>
+      {% if pi.application_fields %}
+        {% for af in pi.application_fields %}{{ af.label }}{% if not loop.last %}; {% endif %}{% endfor %}
+      {% endif %}
       <span class="small muted">(conforme tabela INPI)</span>
     </td>
   </tr>
   <tr>
     <td colspan="2">
-      <strong>Tipo de Programa:</strong> {{ pi.program_type or '' }}
+      <strong>Tipos de Programa:</strong>
+      {% if pi.program_types %}
+        {% for pt in pi.program_types %}{{ pt.label }}{% if not loop.last %}; {% endif %}{% endfor %}
+      {% endif %}
       <span class="small muted">(conforme tabela INPI)</span>
     </td>
   </tr>
   <tr>
     <td colspan="2" style="word-break:break-all;">
-      <strong>Hash do código-fonte (SHA-512):</strong> {{ pi.source_hash or '' }}
+      <strong>Hash do código-fonte:</strong> {{ pi.source_hash or '' }}
     </td>
   </tr>
   <tr>
@@ -86,15 +92,18 @@
 
 <p style="margin-top:10pt; font-size:10pt;">
   <strong>Houve participação de outra instituição no desenvolvimento?</strong>
-  {% if pi.has_partner %}( X ) sim&nbsp;&nbsp;(&nbsp;&nbsp;) não{% else %}(&nbsp;&nbsp;) sim&nbsp;&nbsp;( X ) não{% endif %}
+  {% if has_external_partners(pi) %}( X ) sim&nbsp;&nbsp;(&nbsp;&nbsp;) não{% else %}(&nbsp;&nbsp;) sim&nbsp;&nbsp;( X ) não{% endif %}
 </p>
 
-{% if pi.has_partner %}
-<table style="margin-top:4pt;">
-  <tr><td><strong>Nome:</strong> {{ pi.partner_name or '' }}</td></tr>
-  <tr><td><strong>CNPJ:</strong> {{ pi.partner_cnpj or '' }}</td></tr>
-  <tr><td><strong>Telefone do NIT ou outro contato:</strong> {{ pi.partner_contact or '' }}</td></tr>
+{% if has_external_partners(pi) %}
+  {% for inst in pi.institutions if not inst.is_ifms %}
+<table style="margin-top:8pt;">
+  <tr><td colspan="2"><strong>{{ inst.name }}</strong> — titularidade: {{ inst.percentage|fpercent }}</td></tr>
+  <tr><td><strong>Nome:</strong> {{ inst.name or '' }}</td></tr>
+  <tr><td><strong>CNPJ:</strong> {{ inst.cnpj or '' }}</td></tr>
+  <tr><td><strong>Telefone do NIT ou outro contato:</strong> {{ inst.contact or '' }}</td></tr>
 </table>
+  {% endfor %}
 {% endif %}
 
 {% endblock %}

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import List
-
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -22,7 +20,7 @@ class Settings(BaseSettings):
     app_port: int = 8000
     app_base_url: str = "http://localhost:8000"
 
-    secret_key: str = "change-me"
+    secret_key: str = Field(..., validation_alias="SECRET_KEY")
     session_cookie_name: str = "rpi_session"
 
     database_url: str = "postgresql+psycopg2://rpi:rpi_password@db:5432/rpi"
@@ -31,7 +29,8 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
 
-    admin_emails: str = ""
+    seed_admin_email: str = "gamesparamundo123@gmail.com"
+    seed_admin_name: str = "Administrador IFMS"
 
     mail_mailer: str = "smtp"
     mail_host: str = "sandbox.smtp.mailtrap.io"
@@ -48,20 +47,13 @@ class Settings(BaseSettings):
     author_documents_storage_dir: str = "/app/storage/author_documents"
     pi_files_storage_dir: str = "/app/storage/pi_files"
 
-    @property
-    def admin_emails_list(self) -> List[str]:
-        return [
-            e.strip().lower()
-            for e in self.admin_emails.split(",")
-            if e.strip()
-        ]
-
     @field_validator("secret_key")
     @classmethod
     def _validate_secret(cls, v: str) -> str:
         if not v or len(v) < 16:
-            # Em produção isso deve ser um erro; em dev avisamos.
-            return v or "dev-secret-please-change"
+            raise ValueError(
+                "SECRET_KEY ausente ou muito curta (>= 16 chars). Defina no .env."
+            )
         return v
 
 

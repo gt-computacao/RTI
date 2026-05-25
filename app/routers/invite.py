@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import settings
 from app.database import get_db
 from app.models import (
-    AuthorDeclaration,
     AuthorDocument,
     AuthorDocumentType,
     AuthorProfile,
@@ -40,6 +39,7 @@ def _load_inv(db: Session, token: str):
         db.query(PIAuthor)
         .options(
             selectinload(PIAuthor.profile),
+            selectinload(PIAuthor.institution),
             selectinload(PIAuthor.pi).selectinload(PI.authors).selectinload(PIAuthor.profile),
         )
         .filter(PIAuthor.id == inv.pi_author_id)
@@ -196,7 +196,7 @@ async def invite_submit(token: str, request: Request, db: Session = Depends(get_
     values["ifms_bond_other"] = bond_other_txt if ifms_bond_enum == IfmsBond.outros else None
 
     # Determine campus for coauthor based on institution and primary author's campus
-    if pa.institution == "ifms":
+    if pa.institution and pa.institution.is_ifms:
         primary_author = next((a for a in pa.pi.authors if a.is_primary), None)
         if primary_author and primary_author.profile:
             values["campus"] = primary_author.profile.campus
@@ -250,14 +250,6 @@ async def invite_submit(token: str, request: Request, db: Session = Depends(get_
     except HTTPException:
         db.rollback()
         raise
-
-    db.add(
-        AuthorDeclaration(
-            pi_author_id=pa.id,
-            accepted_truth=True,
-            accepted_confidentiality=True,
-        )
-    )
 
     pa.status = PIAuthorStatus.completed
     pa.completed_at = _utcnow()

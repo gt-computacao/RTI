@@ -14,14 +14,14 @@
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px; font-weight:bold;">Nome da Marca:</td>
-    <td style="border:1px solid #000; padding:8px;">{{ pi.marca_nome or "-" }}</td>
+    <td style="border:1px solid #000; padding:8px;">{{ pi.brand_name or "-" }}</td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px; font-weight:bold;" colspan="2">
       Imagem da marca (para marcas figurativas ou mista) no tamanho de 300x300:
       <div style="min-height:150px; margin-top:10px; text-align:center;">
-        {% if pi.marca_imagem_path %}
-          <img src="file://{{ pi.marca_imagem_path }}" style="max-width:300px; max-height:300px;" alt="Imagem da marca">
+        {% if pi.brand_image_path %}
+          <img src="file://{{ pi.brand_image_path }}" style="max-width:300px; max-height:300px;" alt="Imagem da marca">
         {% else %}
           <em>(Nenhuma imagem fornecida)</em>
         {% endif %}
@@ -34,51 +34,51 @@
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
       <strong>Tipo de marca:</strong>
-      ({{ "X" if pi.marca_tipo == "nominativa" else "&nbsp;&nbsp;" }}) nominativa
+      ({{ "X" if pi.brand_type == "nominativa" else "&nbsp;&nbsp;" }}) nominativa
       &nbsp;&nbsp;&nbsp;
-      ({{ "X" if pi.marca_tipo == "figurativa" else "&nbsp;&nbsp;" }}) figurativa
+      ({{ "X" if pi.brand_type == "figurativa" else "&nbsp;&nbsp;" }}) figurativa
       &nbsp;&nbsp;&nbsp;
-      ({{ "X" if pi.marca_tipo == "mista" else "&nbsp;&nbsp;" }}) mista
+      ({{ "X" if pi.brand_type == "mista" else "&nbsp;&nbsp;" }}) mista
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
       <strong>A marca possui elementos em idioma estrangeiro?</strong>
-      ({{ "X" if not pi.marca_idioma_estrangeiro else "&nbsp;&nbsp;" }}) não
+      ({{ "X" if not pi.brand_has_foreign_language else "&nbsp;&nbsp;" }}) não
       &nbsp;&nbsp;
-      ({{ "X" if pi.marca_idioma_estrangeiro else "&nbsp;&nbsp;" }}) sim
+      ({{ "X" if pi.brand_has_foreign_language else "&nbsp;&nbsp;" }}) sim
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;">
-      <strong>Termo estrangeiro:</strong> {{ pi.marca_termo_estrangeiro or "" }}
+      <strong>Termo estrangeiro:</strong> {{ pi.brand_foreign_term or "" }}
     </td>
     <td style="border:1px solid #000; padding:8px;">
-      <strong>Tradução:</strong> {{ pi.marca_traducao or "" }}
+      <strong>Tradução:</strong> {{ pi.brand_translation or "" }}
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
       <strong>Termos utilizados para busca de colidência:</strong><br>
-      {{ pi.marca_termos_colidencia or "" }}
+      {{ pi.brand_collision_terms or "" }}
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
-      <strong>Classificação de NICE:</strong> {{ pi.marca_nice or "" }}
+      <strong>Classificação de NICE:</strong> {{ pi.brand_nice_classification or "" }}
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
-      <strong>Classificação de Viena:</strong> {{ pi.marca_viena or "" }}
+      <strong>Classificação de Viena:</strong> {{ pi.brand_vienna_classification or "" }}
     </td>
   </tr>
   <tr>
     <td style="border:1px solid #000; padding:8px;" colspan="2">
       <strong>Indicada a proteção sim ou não? Justificativa:</strong><br>
-      {{ "Sim" if pi.marca_protecao_indicada else "Não" }}
-      {% if pi.marca_protecao_justificativa %}
-        — {{ pi.marca_protecao_justificativa }}
+      {{ "Sim" if pi.brand_protection_requested else "Não" }}
+      {% if pi.brand_protection_justification %}
+        — {{ pi.brand_protection_justification }}
       {% endif %}
     </td>
   </tr>

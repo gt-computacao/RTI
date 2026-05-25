@@ -36,219 +36,18 @@
       <input type="text" name="title" required value="{{ form.title }}" placeholder="Ex: Sistema X para gestão de Y" />
     </div>
 
-    <div class="form-grid-2">
-      <div class="form-row">
-        <label>Tipo *</label>
-        <select name="type" id="pi-type-select" required>
-          {% for k, label in pi_types.items() %}
-            <option value="{{ k }}" {% if form.type == k %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="form-row">
-        <label>Sua porcentagem (%) *</label>
-        <input type="number" name="primary_percentage" min="0" max="100" step="0.01" required inputmode="decimal"
-               value="{{ form.primary_percentage }}" placeholder="ex: 50" />
-      </div>
+    <div class="form-row">
+      <label>Tipo *</label>
+      <select name="type" id="pi-type-select" required>
+        {% for k, label in pi_types.items() %}
+          <option value="{{ k }}" {% if form.type == k %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
     </div>
 
     <div class="form-row">
       <label>Descrição (opcional)</label>
       <textarea name="description" rows="3" placeholder="Breve descrição">{{ form.description }}</textarea>
-    </div>
-  </fieldset>
-
-  {# ============== SOFTWARE SECTION ============== #}
-  <fieldset id="software-section" {% if form.type != "software" %}style="display:none"{% endif %}>
-    <legend>Dados do Programa (Anexo I)</legend>
-
-    <div class="form-row">
-      <label>Linguagem de Programação *</label>
-      <input type="text" name="programming_language" value="{{ form.programming_language }}"
-             placeholder="Ex: Python, Java, JavaScript" />
-    </div>
-
-    <div class="form-grid-2">
-      <div class="form-row">
-        <label>Data de Criação</label>
-        <input type="date" name="creation_date" value="{{ form.creation_date }}" />
-      </div>
-      <div class="form-row">
-        <label>Data de Publicação</label>
-        <input type="date" name="publication_date" value="{{ form.publication_date }}" />
-      </div>
-    </div>
-
-    <div class="form-row">
-      <label>Campo de Aplicação *</label>
-      <input type="text" name="application_field" value="{{ form.application_field }}"
-             list="application-fields-list" placeholder="Digite ou selecione..." />
-      <datalist id="application-fields-list">
-        {% for af in APPLICATION_FIELDS %}
-          <option value="{{ af }}">
-        {% endfor %}
-      </datalist>
-    </div>
-
-    <div class="form-row">
-      <label>Tipo de Programa *</label>
-      <input type="text" name="program_type" value="{{ form.program_type }}"
-             list="program-types-list" placeholder="Digite ou selecione..." />
-      <datalist id="program-types-list">
-        {% for pt in PROGRAM_TYPES %}
-          <option value="{{ pt }}">
-        {% endfor %}
-      </datalist>
-    </div>
-
-    <div class="form-row">
-      <label>
-        Hash do código-fonte (SHA-512) *
-        <a href="https://emn178.github.io/online-tools/sha512_file_hash.html"
-           target="_blank" class="muted small" style="margin-left:4px;">(gerar hash online)</a>
-      </label>
-      <input type="text" name="source_hash" value="{{ form.source_hash }}"
-             placeholder="Cole o hash SHA-512 do código-fonte aqui" />
-    </div>
-
-    <label class="checkbox">
-      <input type="checkbox" name="is_derived" id="is_derived"
-             {% if form.is_derived %}checked{% endif %}
-             onchange="document.getElementById('derived-block').style.display = this.checked ? 'block' : 'none';" />
-      <span>O programa é derivado de programa anterior?</span>
-    </label>
-
-    <div id="derived-block" {% if not form.is_derived %}style="display:none"{% endif %}>
-      <div class="form-grid-2">
-        <div class="form-row">
-          <label>Título do programa original</label>
-          <input type="text" name="derived_title" value="{{ form.derived_title }}" />
-        </div>
-        <div class="form-row">
-          <label>Número do registro original</label>
-          <input type="text" name="derived_registration" value="{{ form.derived_registration }}" />
-        </div>
-      </div>
-    </div>
-
-    <div class="form-row" style="margin-top:12px;">
-      <label>Vídeo ou Manual do Sistema</label>
-      <input type="file" name="video_file" accept=".mp4,.avi,.mkv,.pdf,.docx,.zip,.rar" />
-      <div class="muted small">MP4/AVI/PDF/DOCX/ZIP. Máx 200MB.</div>
-    </div>
-
-    <div class="form-row">
-      <label>Upload do Código Fonte (ZIP) *</label>
-      <input type="file" name="source_code_file" accept=".zip,.rar,.7z,.tar,.gz" />
-      <div class="muted small">ZIP/RAR/7Z/TAR/GZ. Máx 200MB.</div>
-    </div>
-  </fieldset>
-
-  {# ============== MARCA SECTION ============== #}
-  <fieldset id="marca-section" {% if form.type != "marca" %}style="display:none"{% endif %}>
-    <legend>Dados do Registro de Marca</legend>
-
-    <div class="form-row">
-      <label>Nome da Marca *</label>
-      <input type="text" name="marca_nome" value="{{ form.marca_nome }}" placeholder="Nome da marca" />
-    </div>
-
-    <div class="form-row">
-      <label>Tipo de Marca *</label>
-      <select name="marca_tipo">
-        <option value="">Selecione...</option>
-        <option value="nominativa" {% if form.marca_tipo == "nominativa" %}selected{% endif %}>Nominativa</option>
-        <option value="figurativa" {% if form.marca_tipo == "figurativa" %}selected{% endif %}>Figurativa</option>
-        <option value="mista" {% if form.marca_tipo == "mista" %}selected{% endif %}>Mista</option>
-      </select>
-    </div>
-
-    <div class="form-row">
-      <label>Imagem da Marca (300x300, para figurativa ou mista)</label>
-      <input type="file" name="marca_imagem_file" accept=".jpg,.jpeg,.png,.gif,.svg,.webp" />
-      <div class="muted small">JPG/PNG/GIF/SVG/WEBP. Máx 10MB.</div>
-    </div>
-
-    <label class="checkbox">
-      <input type="checkbox" name="marca_idioma_estrangeiro" id="marca_idioma_estrangeiro"
-             {% if form.marca_idioma_estrangeiro %}checked{% endif %}
-             onchange="document.getElementById('marca-estrangeiro-block').style.display = this.checked ? 'block' : 'none';" />
-      <span>A marca possui elementos em idioma estrangeiro?</span>
-    </label>
-
-    <div id="marca-estrangeiro-block" {% if not form.marca_idioma_estrangeiro %}style="display:none"{% endif %}>
-      <div class="form-grid-2">
-        <div class="form-row">
-          <label>Termo estrangeiro</label>
-          <input type="text" name="marca_termo_estrangeiro" value="{{ form.marca_termo_estrangeiro }}" />
-        </div>
-        <div class="form-row">
-          <label>Tradução</label>
-          <input type="text" name="marca_traducao" value="{{ form.marca_traducao }}" />
-        </div>
-      </div>
-    </div>
-
-    <div class="form-row">
-      <label>Termos utilizados para busca de colidência</label>
-      <textarea name="marca_termos_colidencia" rows="2">{{ form.marca_termos_colidencia }}</textarea>
-    </div>
-
-    <div class="form-grid-2">
-      <div class="form-row">
-        <label>Classificação de NICE</label>
-        <input type="text" name="marca_nice" value="{{ form.marca_nice }}" />
-      </div>
-      <div class="form-row">
-        <label>Classificação de Viena</label>
-        <input type="text" name="marca_viena" value="{{ form.marca_viena }}" />
-      </div>
-    </div>
-
-    <label class="checkbox">
-      <input type="checkbox" name="marca_protecao_indicada"
-             {% if form.marca_protecao_indicada %}checked{% endif %} />
-      <span>Indicada a proteção?</span>
-    </label>
-
-    <div class="form-row">
-      <label>Justificativa</label>
-      <textarea name="marca_protecao_justificativa" rows="2">{{ form.marca_protecao_justificativa }}</textarea>
-    </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Parceria com instituição</legend>
-
-    <label class="checkbox">
-      <input type="checkbox" name="has_partner" id="has_partner"
-             {% if form.has_partner %}checked{% endif %}
-             onchange="document.getElementById('partner-block').style.display = this.checked ? 'block' : 'none';" />
-      <span>Possui instituição parceira</span>
-    </label>
-
-    <div id="partner-block" {% if not form.has_partner %}style="display:none"{% endif %}>
-      <p class="muted small" style="margin-bottom:10px;">
-        A participação da instituição parceira no Anexo IV é a <strong>soma das %</strong> dos coautores
-        cuja instituição for "Instituição parceira" (você como autor principal permanece vinculado ao IFMS).
-      </p>
-      <div class="form-grid-2">
-        <div class="form-row">
-          <label>Nome da instituição</label>
-          <input type="text" name="partner_name" value="{{ form.partner_name }}" />
-        </div>
-        <div class="form-row">
-          <label>CNPJ</label>
-          <input type="text" name="partner_cnpj" value="{{ form.partner_cnpj }}"
-                 inputmode="numeric" autocomplete="off" maxlength="18"
-                 pattern="\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}" data-mask="cnpj"
-                 placeholder="00.000.000/0000-00" />
-        </div>
-      </div>
-      <div class="form-row">
-        <label>Contato (responsável / email / telefone)</label>
-        <input type="text" name="partner_contact" value="{{ form.partner_contact }}" />
-      </div>
     </div>
   </fieldset>
 
@@ -421,48 +220,345 @@
     </div>
   </fieldset>
 
+  {# ============== SOFTWARE SECTION ============== #}
+  <fieldset id="software-section" {% if form.type != "software" %}style="display:none"{% endif %}>
+    <legend>Dados do Programa</legend>
+
+    <div class="form-row">
+      <label>Linguagem de Programação *</label>
+      <input type="text" name="programming_language" value="{{ form.programming_language }}"
+             placeholder="Ex: Python, Java, JavaScript" />
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Data de Criação</label>
+        <input type="date" name="creation_date" value="{{ form.creation_date }}" />
+      </div>
+      <div class="form-row">
+        <label>Data de Publicação</label>
+        <input type="date" name="publication_date" value="{{ form.publication_date }}" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Campos de Aplicação * <span class="muted small">(selecione um ou mais)</span></label>
+      <div class="catalog-search">
+        <input type="search" class="catalog-filter" data-target="app-fields-list"
+               placeholder="Buscar campo de aplicação..." autocomplete="off"
+               aria-label="Buscar campo de aplicação" />
+      </div>
+      <div id="app-fields-list" class="checkbox-list catalog-list" data-validate="application-fields">
+        {% for af in application_fields_catalog %}
+          <label class="catalog-item" data-label="{{ af.label|lower }}">
+            <input type="checkbox" name="application_field_ids" value="{{ af.id }}"
+                   {% if af.id in form.application_field_ids %}checked{% endif %} />
+            {{ af.label }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Tipos de Programa * <span class="muted small">(selecione um ou mais)</span></label>
+      <div class="catalog-search">
+        <input type="search" class="catalog-filter" data-target="program-types-list"
+               placeholder="Buscar tipo de programa..." autocomplete="off"
+               aria-label="Buscar tipo de programa" />
+      </div>
+      <div id="program-types-list" class="checkbox-list catalog-list" data-validate="program-types">
+        {% for pt in program_types_catalog %}
+          <label class="catalog-item" data-label="{{ pt.label|lower }}">
+            <input type="checkbox" name="program_type_ids" value="{{ pt.id }}"
+                   {% if pt.id in form.program_type_ids %}checked{% endif %} />
+            {{ pt.label }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>
+        Hash do código-fonte *
+        <a href="https://hash.online-convert.com/pt/gerador-sha256"
+           target="_blank" rel="noopener" class="muted small" style="margin-left:4px;">(gerar hash online)</a>
+      </label>
+      <input type="text" name="source_hash" value="{{ form.source_hash }}"
+             placeholder="Cole o hash do código-fonte aqui" />
+    </div>
+
+    <label class="checkbox">
+      <input type="checkbox" name="is_derived" id="is_derived"
+             {% if form.is_derived %}checked{% endif %}
+             onchange="document.getElementById('derived-block').style.display = this.checked ? 'block' : 'none';" />
+      <span>O programa é derivado de programa anterior?</span>
+    </label>
+
+    <div id="derived-block" {% if not form.is_derived %}style="display:none"{% endif %}>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label>Título do programa original</label>
+          <input type="text" name="derived_title" value="{{ form.derived_title }}" />
+        </div>
+        <div class="form-row">
+          <label>Número do registro original</label>
+          <input type="text" name="derived_registration" value="{{ form.derived_registration }}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-grid-2" style="margin-top:12px;">
+      <div class="form-row">
+        <label>Vídeo ou Manual do Sistema</label>
+        <div class="upload">
+          <label class="upload-btn" data-upload-label="Escolher vídeo ou manual">
+            <input class="upload-input" type="file" name="video_file"
+                   accept=".mp4,.avi,.mkv,.pdf,.docx,.zip,.rar" />
+            <span class="upload-btn-text">Escolher vídeo ou manual</span>
+          </label>
+          <button type="button" class="upload-remove-btn" hidden aria-label="Remover arquivo">&times; Remover arquivo</button>
+          <div class="upload-filename muted small" aria-live="polite">Nenhum arquivo selecionado.</div>
+          <div class="muted small">MP4/AVI/PDF/DOCX/ZIP. Máx 200MB.</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Upload do Código Fonte (ZIP) *</label>
+        <div class="upload">
+          <label class="upload-btn" data-upload-label="Escolher código-fonte (ZIP)">
+            <input class="upload-input" type="file" name="source_code_file"
+                   accept=".zip,.rar,.7z,.tar,.gz"
+                   {% if not edit_mode %}required{% endif %} />
+            <span class="upload-btn-text">Escolher código-fonte (ZIP)</span>
+          </label>
+          <button type="button" class="upload-remove-btn" hidden aria-label="Remover arquivo">&times; Remover arquivo</button>
+          <div class="upload-filename muted small" aria-live="polite">Nenhum arquivo selecionado.</div>
+          <div class="muted small">ZIP/RAR/7Z/TAR/GZ. Máx 200MB.</div>
+        </div>
+      </div>
+    </div>
+  </fieldset>
+
+  {# ============== BRAND (MARCA) SECTION ============== #}
+  <fieldset id="brand-section" {% if form.type != "marca" %}style="display:none"{% endif %}>
+    <legend>Dados do Registro de Marca</legend>
+
+    <div class="form-row">
+      <label>Nome da Marca *</label>
+      <input type="text" name="brand_name" value="{{ form.brand_name }}" placeholder="Nome da marca" />
+    </div>
+
+    <div class="form-row">
+      <label>Tipo de Marca *</label>
+      <select name="brand_type">
+        <option value="">Selecione...</option>
+        <option value="nominativa" {% if form.brand_type == "nominativa" %}selected{% endif %}>Nominativa</option>
+        <option value="figurativa" {% if form.brand_type == "figurativa" %}selected{% endif %}>Figurativa</option>
+        <option value="mista" {% if form.brand_type == "mista" %}selected{% endif %}>Mista</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label>Imagem da Marca (300x300, para figurativa ou mista)</label>
+      <input type="file" name="brand_image_file" accept=".jpg,.jpeg,.png,.gif,.svg,.webp" />
+      <div class="muted small">JPG/PNG/GIF/SVG/WEBP. Máx 10MB.</div>
+    </div>
+
+    <label class="checkbox">
+      <input type="checkbox" name="brand_has_foreign_language" id="brand_has_foreign_language"
+             {% if form.brand_has_foreign_language %}checked{% endif %}
+             onchange="document.getElementById('brand-foreign-language-block').style.display = this.checked ? 'block' : 'none';" />
+      <span>A marca possui elementos em idioma estrangeiro?</span>
+    </label>
+
+    <div id="brand-foreign-language-block" {% if not form.brand_has_foreign_language %}style="display:none"{% endif %}>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label>Termo estrangeiro</label>
+          <input type="text" name="brand_foreign_term" value="{{ form.brand_foreign_term }}" />
+        </div>
+        <div class="form-row">
+          <label>Tradução</label>
+          <input type="text" name="brand_translation" value="{{ form.brand_translation }}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Termos utilizados para busca de colidência</label>
+      <textarea name="brand_collision_terms" rows="2">{{ form.brand_collision_terms }}</textarea>
+    </div>
+
+    <div class="form-grid-2">
+      <div class="form-row">
+        <label>Classificação de NICE</label>
+        <input type="text" name="brand_nice_classification" value="{{ form.brand_nice_classification }}" />
+      </div>
+      <div class="form-row">
+        <label>Classificação de Viena</label>
+        <input type="text" name="brand_vienna_classification" value="{{ form.brand_vienna_classification }}" />
+      </div>
+    </div>
+
+    <label class="checkbox">
+      <input type="checkbox" name="brand_protection_requested"
+             {% if form.brand_protection_requested %}checked{% endif %} />
+      <span>Indicada a proteção?</span>
+    </label>
+
+    <div class="form-row">
+      <label>Justificativa</label>
+      <textarea name="brand_protection_justification" rows="2">{{ form.brand_protection_justification }}</textarea>
+    </div>
+  </fieldset>
+
+  {# ============================================================== #}
+  {# INSTITUIÇÕES E PARTICIPAÇÃO                                     #}
+  {# ============================================================== #}
+
+  <fieldset id="institutions-section">
+    <legend>Instituições parceiras</legend>
+    <p class="muted small">
+      Defina a <strong>titularidade de cada instituição</strong> na PI (soma = 100%).
+      Isso é independente da participação global de cada pessoa abaixo.
+    </p>
+
+    <div class="institution-ifms-row card" style="padding:12px; margin-bottom:12px;">
+      <input type="hidden" name="partner_institution_key" value="ifms" disabled />
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label>IFMS (sempre presente)</label>
+          <input type="text" value="IFMS" readonly />
+        </div>
+        <div class="form-row">
+          <label>% titularidade na PI *</label>
+          <input type="number" name="ifms_institution_percentage"
+                 id="ifms_institution_percentage"
+                 value="{{ form.ifms_institution_percentage or '100' }}"
+                 min="0.01" max="100" step="0.01" required inputmode="decimal"
+                 class="institution-percentage-input" />
+        </div>
+      </div>
+    </div>
+
+    <div id="partner-institutions-list">
+      {% for p in partner_institutions %}
+        {% include "pi/_partner_institution_row.html" %}
+      {% endfor %}
+    </div>
+
+    <button type="button" class="btn btn-ghost btn-sm" id="add-partner-institution-btn"
+            hx-get="/pis/_partner_institution_row"
+            hx-target="#partner-institutions-list"
+            hx-swap="beforeend">
+      + Adicionar instituição parceira
+    </button>
+
+    <div class="sticky-total" style="position:static; margin-top:12px; flex-wrap:wrap;">
+      <span>Soma das instituições: <span id="institution-total-percent" class="warn">100%</span></span>
+      <small id="institution-total-note" class="warn" hidden></small>
+    </div>
+  </fieldset>
+
+  <fieldset id="participation-section">
+    <legend>Participações (pessoas)</legend>
+    <p class="muted small">
+      A <strong>participação global</strong> de cada pessoa na PI deve somar 100%.
+      Adicione cada participante <strong>dentro do bloco da sua instituição</strong> —
+      o vínculo institucional é definido automaticamente pelo bloco.
+    </p>
+
+    <input type="hidden" name="primary_institution_key" id="primary_institution_key"
+           value="{{ form.primary_institution_key or 'ifms' }}" />
+
+    <div class="participation-block card" data-institution-block="ifms" style="padding:12px; margin-bottom:12px;">
+      <h3 style="margin:0 0 12px;">IFMS</h3>
+      {% if (form.primary_institution_key or 'ifms') == 'ifms' %}
+      <div class="form-grid-3 primary-author-row">
+        <div class="form-row">
+          <label>Autor principal</label>
+          <input type="text" value="{{ user.name }}" readonly />
+        </div>
+        <div class="form-row">
+          <label>Email</label>
+          <input type="text" value="{{ user.email }}" readonly />
+        </div>
+        <div class="form-row">
+          <label>% participação global *</label>
+          <input type="number" name="primary_percentage" min="0.01" max="100" step="0.01" required
+                 inputmode="decimal" value="{{ form.primary_percentage }}" placeholder="ex: 25" />
+        </div>
+      </div>
+      {% endif %}
+      <div id="coauthors-ifms-list">
+        {% for c in coauthors %}
+          {% if c.institution_key == 'ifms' %}
+            {% include "pi/_coauthor_row.html" %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm add-coauthor-btn"
+              data-target="coauthors-ifms-list" data-default-institution="ifms">
+        + Adicionar participante IFMS
+      </button>
+    </div>
+
+    {% for p in partner_institutions %}
+      <div class="participation-block card" data-institution-block="{{ p.key }}"
+           style="padding:12px; margin-bottom:12px;">
+        <h3 style="margin:0 0 12px;">{{ p.name or 'Instituição parceira' }}</h3>
+        {% if form.primary_institution_key == p.key %}
+        <div class="form-grid-3 primary-author-row">
+          <div class="form-row">
+            <label>Autor principal</label>
+            <input type="text" value="{{ user.name }}" readonly />
+          </div>
+          <div class="form-row">
+            <label>Email</label>
+            <input type="text" value="{{ user.email }}" readonly />
+          </div>
+          <div class="form-row">
+            <label>% participação global *</label>
+            <input type="number" name="primary_percentage" min="0.01" max="100" step="0.01" required
+                   inputmode="decimal" value="{{ form.primary_percentage }}" placeholder="ex: 25" />
+          </div>
+        </div>
+        {% endif %}
+        <div id="coauthors-{{ p.key }}-list" class="coauthors-partner-list">
+          {% for c in coauthors %}
+            {% if c.institution_key == p.key %}
+              {% include "pi/_coauthor_row.html" %}
+            {% endif %}
+          {% endfor %}
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm add-coauthor-btn"
+                data-target="coauthors-{{ p.key }}-list" data-default-institution="{{ p.key }}">
+          + Adicionar participante
+        </button>
+      </div>
+    {% endfor %}
+
+    <div class="sticky-total" style="position:static; margin-top:12px; flex-wrap:wrap;">
+      <span>Soma da participação global: <span id="total-percent" class="warn">0%</span></span>
+      <small class="muted">(deve ser exatamente 100%)</small>
+      <small id="participation-total-note" class="warn" hidden></small>
+    </div>
+  </fieldset>
+
   {% if not edit_mode %}
   <fieldset>
     <legend>Declarações obrigatórias</legend>
     <label class="checkbox">
       <input type="checkbox" name="accepted_truth"
              {% if accepted_truth %}checked{% endif %} required />
-      <span>Declaro que as informações prestadas são verdadeiras (Anexo III).</span>
+      <span>Declaro que as informações prestadas são verdadeiras.</span>
     </label>
     <label class="checkbox">
       <input type="checkbox" name="accepted_confidentiality"
              {% if accepted_confidentiality %}checked{% endif %} required />
-      <span>Aceito o termo de confidencialidade (Anexo V).</span>
+      <span>Aceito o termo de confidencialidade.</span>
     </label>
   </fieldset>
   {% endif %}
-
-  {# ============================================================== #}
-  {# COAUTORES (recebem convite por email)                           #}
-  {# ============================================================== #}
-
-  <fieldset>
-    <legend>Coautores</legend>
-    <p class="muted small">
-      Cada coautor receberá um email com link para preencher o cadastro completo.
-      A soma das porcentagens (suas + coautores) deve ser exatamente <strong>100%</strong>.
-    </p>
-
-    <div id="coauthors-list">
-      {% if coauthors %}
-        {% for c in coauthors %}
-          {% include "pi/_coauthor_row.html" %}
-        {% endfor %}
-      {% endif %}
-    </div>
-
-    <button type="button" class="btn btn-ghost btn-sm"
-            hx-get="/pis/_coauthor_row"
-            hx-target="#coauthors-list"
-            hx-swap="beforeend">
-      + Adicionar coautor
-    </button>
-  </fieldset>
 
   <div class="form-actions">
     <a href="/dashboard" class="btn btn-ghost">Cancelar</a>
@@ -492,17 +588,181 @@
     // Type-dependent section visibility
     var typeSelect = document.getElementById("pi-type-select");
     var softwareSection = document.getElementById("software-section");
-    var marcaSection = document.getElementById("marca-section");
+    var brandSection = document.getElementById("brand-section");
 
     function syncTypeSections() {
       if (!typeSelect) return;
       var val = typeSelect.value;
       if (softwareSection) softwareSection.style.display = val === "software" ? "" : "none";
-      if (marcaSection) marcaSection.style.display = val === "marca" ? "" : "none";
+      if (brandSection) brandSection.style.display = val === "marca" ? "" : "none";
     }
     if (typeSelect) {
-      typeSelect.addEventListener("change", syncTypeSections);
+      typeSelect.addEventListener("change", function () {
+        syncTypeSections();
+        validateAllFields();
+      });
       syncTypeSections();
+    }
+
+    // Catalog search filters
+    document.querySelectorAll(".catalog-filter").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var targetId = inp.getAttribute("data-target");
+        var list = document.getElementById(targetId);
+        if (!list) return;
+        var q = (inp.value || "").toLowerCase();
+        list.querySelectorAll(".catalog-item").forEach(function (item) {
+          var label = item.getAttribute("data-label") || "";
+          item.style.display = !q || label.indexOf(q) >= 0 ? "" : "none";
+        });
+      });
+    });
+
+    function isSoftwareType() {
+      return typeSelect && typeSelect.value === "software";
+    }
+
+    function validateField(el) {
+      if (!el || el.disabled) return;
+      var name = el.name || "";
+      var tag = (el.tagName || "").toLowerCase();
+
+      if (name === "title") {
+        if (!el.value.trim()) el.setCustomValidity("Informe o título da Propriedade Intelectual.");
+        else el.setCustomValidity("");
+        return;
+      }
+      if (name === "programming_language" && isSoftwareType()) {
+        if (!el.value.trim()) el.setCustomValidity("Informe a linguagem de programação.");
+        else el.setCustomValidity("");
+        return;
+      }
+      if (name === "source_hash" && isSoftwareType()) {
+        if (!el.value.trim()) el.setCustomValidity("Informe o hash do código-fonte.");
+        else el.setCustomValidity("");
+        return;
+      }
+      if ((name === "creation_date" || name === "publication_date") && isSoftwareType()) {
+        var cd = document.querySelector('input[name="creation_date"]');
+        var pd = document.querySelector('input[name="publication_date"]');
+        var ok = (cd && cd.value) || (pd && pd.value);
+        if (cd) cd.setCustomValidity(ok ? "" : "Informe a data de criação ou a data de publicação.");
+        if (pd) pd.setCustomValidity(ok ? "" : "Informe a data de criação ou a data de publicação.");
+        return;
+      }
+      if (tag === "select" && el.id === "pi-type-select") {
+        if (!el.value) el.setCustomValidity("Selecione o tipo da Propriedade Intelectual.");
+        else el.setCustomValidity("");
+      }
+    }
+
+    function validateCatalogGroup(listEl, message) {
+      if (!listEl) return;
+      var checked = listEl.querySelectorAll('input[type="checkbox"]:checked').length;
+      var invalid = isSoftwareType() && checked === 0;
+      listEl.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+        cb.setCustomValidity(invalid ? message : "");
+      });
+    }
+
+    function validateAllFields() {
+      var form = document.getElementById("pi-form");
+      if (!form) return true;
+      form.querySelectorAll("input, select, textarea").forEach(function (el) {
+        if (el.type === "checkbox" && (el.name === "application_field_ids" || el.name === "program_type_ids")) return;
+        validateField(el);
+      });
+      validateCatalogGroup(
+        document.getElementById("app-fields-list"),
+        "Selecione pelo menos um campo de aplicação."
+      );
+      validateCatalogGroup(
+        document.getElementById("program-types-list"),
+        "Selecione pelo menos um tipo de programa."
+      );
+      recompute();
+      return form.checkValidity();
+    }
+
+    function getFieldRow(el) {
+      return el.closest(".form-row") || el.parentElement;
+    }
+
+    function showFieldError(el) {
+      if (!el || el.disabled) return;
+      if (el.type === "hidden" || el.type === "submit" || el.type === "button") return;
+      var row = getFieldRow(el);
+      if (!row) return;
+      var message = el.validationMessage || "";
+      var existing = row.querySelector(":scope > .field-error-message");
+      if (!message) {
+        row.classList.remove("has-error");
+        if (existing) existing.remove();
+        el.removeAttribute("aria-invalid");
+        return;
+      }
+      row.classList.add("has-error");
+      el.setAttribute("aria-invalid", "true");
+      if (existing) {
+        existing.textContent = message;
+      } else {
+        var msg = document.createElement("small");
+        msg.className = "field-error-message";
+        msg.textContent = message;
+        row.appendChild(msg);
+      }
+    }
+
+    function clearFieldError(el) {
+      if (!el) return;
+      var row = getFieldRow(el);
+      if (!row) return;
+      row.classList.remove("has-error");
+      el.removeAttribute("aria-invalid");
+      var existing = row.querySelector(":scope > .field-error-message");
+      if (existing) existing.remove();
+    }
+
+    var piForm = document.getElementById("pi-form");
+    if (piForm) {
+      piForm.querySelectorAll("input, select, textarea").forEach(function (el) {
+        el.addEventListener("blur", function () {
+          validateField(el);
+          el.dataset.validated = "1";
+          showFieldError(el);
+        });
+        el.addEventListener("change", function () {
+          validateField(el);
+          showFieldError(el);
+        });
+        el.addEventListener("input", function () {
+          setTimeout(function () {
+            if (el.dataset.validated === "1" && el.validationMessage) {
+              showFieldError(el);
+            } else {
+              clearFieldError(el);
+            }
+          }, 0);
+        });
+      });
+      document.querySelectorAll('input[name="application_field_ids"], input[name="program_type_ids"]').forEach(function (cb) {
+        cb.addEventListener("change", validateAllFields);
+        cb.addEventListener("blur", validateAllFields);
+      });
+      piForm.addEventListener("submit", function (evt) {
+        if (!validateAllFields()) {
+          evt.preventDefault();
+          piForm.querySelectorAll("input, select, textarea").forEach(function (el) {
+            el.dataset.validated = "1";
+            showFieldError(el);
+          });
+          var first = piForm.querySelector(":invalid");
+          if (first) {
+            first.reportValidity();
+            if (typeof first.focus === "function") first.focus();
+          }
+        }
+      });
     }
 
     // IFMS bond + campus logic
@@ -658,11 +918,7 @@
         }
 
         if (kind === "cnpj") {
-          const hasPartner = document.getElementById("has_partner");
-          const partnerChecked = !!(hasPartner && hasPartner.checked);
-          if (!partnerChecked && !el.value) {
-            el.setCustomValidity("");
-          } else if (!el.value) {
+          if (!el.value) {
             el.setCustomValidity("");
           } else if (el.value.length < 18) {
             el.setCustomValidity("CNPJ incompleto.");
@@ -679,7 +935,7 @@
   }
 
   function applyUploads(root) {
-    const inputs = (root || document).querySelectorAll(".upload-input");
+    const inputs = (root || document).querySelectorAll(".upload-input:not([data-upload-bound])");
     inputs.forEach((input) => {
       const wrap   = input.closest(".upload");
       const btn    = wrap?.querySelector(".upload-btn");
@@ -688,6 +944,7 @@
       const rmBtn  = wrap?.querySelector(".upload-remove-btn");
       if (!btn || !nameEl || !txtEl) return;
 
+      input.dataset.uploadBound = "1";
       const baseLabel = btn.getAttribute("data-upload-label") || "Escolher arquivo";
 
       const update = () => {
@@ -713,43 +970,215 @@
     });
   }
 
-  function recompute() {
-    const inputs = document.querySelectorAll('input[name="coauthor_percentage"], input[name="primary_percentage"]');
-    let total = 0;
-    inputs.forEach(i => {
-      normalizeNumberInput(i);
-      total += parseFloat((i.value || "0")) || 0;
-    });
-    const el = document.getElementById('total-percent');
-    if (el) {
-      el.textContent = total.toFixed(2) + '%';
-      el.className = Math.abs(total - 100) < 0.01 ? 'ok' : 'warn';
-    }
+  function buildCoauthorRow(defaultKey) {
+    var key = defaultKey || "ifms";
+    var row = document.createElement("div");
+    row.className = "coauthor-row";
+    row.setAttribute("data-coauthor-row", "");
+    row.setAttribute("data-institution-key", key);
+    row.innerHTML =
+      '<div class="form-grid-3">' +
+      '<div class="form-row"><label>Nome *</label><input type="text" name="coauthor_name" required /></div>' +
+      '<div class="form-row"><label>Email *</label><input type="email" name="coauthor_email" required /></div>' +
+      '<div class="form-row"><label>% participação global *</label><input type="number" name="coauthor_percentage" min="0.01" max="100" step="0.01" required inputmode="decimal" /></div>' +
+      '</div>' +
+      '<input type="hidden" name="coauthor_institution_key" value="' + key + '" />' +
+      '<button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'.coauthor-row\').remove(); document.dispatchEvent(new Event(\'input\')); syncParticipationUI();">Remover coautor</button>';
+    return row;
+  }
 
-    const primary = document.querySelector('input[name="primary_percentage"]');
-    if (primary) {
-      if (Math.abs(total - 100) < 0.01) primary.setCustomValidity("");
-      else primary.setCustomValidity("A soma das porcentagens deve ser exatamente 100%.");
+  window.ensureParticipationBlock = function (key, name) {
+    if (!key || document.querySelector('[data-institution-block="' + key + '"]')) return;
+    var section = document.getElementById("participation-section");
+    var totalRow = section.querySelector(".sticky-total");
+    var block = document.createElement("div");
+    block.className = "participation-block card";
+    block.setAttribute("data-institution-block", key);
+    block.style.cssText = "padding:12px; margin-bottom:12px;";
+    block.innerHTML =
+      '<h3 style="margin:0 0 12px;">' + (name || "Instituição parceira") + '</h3>' +
+      '<div id="coauthors-' + key + '-list" class="coauthors-partner-list"></div>' +
+      '<button type="button" class="btn btn-ghost btn-sm add-coauthor-btn" data-target="coauthors-' + key + '-list" data-default-institution="' + key + '">+ Adicionar participante</button>';
+    section.insertBefore(block, totalRow);
+    block.querySelector(".add-coauthor-btn").addEventListener("click", onAddCoauthorClick);
+  };
+
+  window.removePartnerInstitution = function (btn) {
+    var row = btn.closest(".partner-institution-row");
+    if (!row) return;
+    var key = row.getAttribute("data-institution-key");
+    row.remove();
+    var block = document.querySelector('[data-institution-block="' + key + '"]');
+    if (block) block.remove();
+    syncParticipationUI();
+  };
+
+  function onAddCoauthorClick(evt) {
+    var btn = evt.currentTarget;
+    var targetId = btn.getAttribute("data-target");
+    var defaultKey = btn.getAttribute("data-default-institution") || "ifms";
+    var list = document.getElementById(targetId);
+    if (!list) return;
+    list.appendChild(buildCoauthorRow(defaultKey));
+    syncParticipationUI();
+  }
+
+  window.syncParticipationUI = function () {
+    recomputeInstitutions();
+    recompute();
+    document.querySelectorAll(".partner-institution-row").forEach(function (row) {
+      var key = row.getAttribute("data-institution-key");
+      var nameInp = row.querySelector(".partner-institution-name");
+      var title = document.querySelector('[data-institution-block="' + key + '"] h3');
+      if (title && nameInp) title.textContent = nameInp.value || "Instituição parceira";
+    });
+  };
+
+  function flagZeroInput(el, zeroMsg) {
+    var raw = (el.value || "").trim();
+    if (raw === "") return { filled: false, zero: false, value: 0 };
+    var v = parseFloat(raw.replace(",", ".")) || 0;
+    if (v <= 0) {
+      el.setCustomValidity(zeroMsg);
+      return { filled: true, zero: true, value: 0 };
+    }
+    el.setCustomValidity("");
+    return { filled: true, zero: false, value: v };
+  }
+
+  function renderTotalNote(noteEl, zeros, zerosLabel, sumOk, total) {
+    if (!noteEl) return;
+    var msgs = [];
+    if (zeros > 0) {
+      msgs.push(
+        zeros + " " + (zeros === 1 ? zerosLabel.singular : zerosLabel.plural) +
+        " com 0% — corrija antes de enviar"
+      );
+    }
+    if (!sumOk) {
+      msgs.push("soma atual " + total.toFixed(2) + "% (deve ser 100%)");
+    }
+    if (msgs.length) {
+      noteEl.textContent = msgs.join(" · ");
+      noteEl.hidden = false;
+    } else {
+      noteEl.textContent = "";
+      noteEl.hidden = true;
     }
   }
-  document.addEventListener('input', recompute);
-  document.body.addEventListener('htmx:afterSwap', (evt) => {
-    applyMasks(evt.target);
-    applyUploads(evt.target);
+
+  function recomputeInstitutions() {
+    var inputs = document.querySelectorAll(".institution-percentage-input");
+    var total = 0;
+    var zeros = 0;
+    inputs.forEach(function (i) {
+      normalizeNumberInput(i);
+      var res = flagZeroInput(i, "A titularidade desta instituição deve ser maior que 0%.");
+      total += res.value;
+      if (res.zero) zeros++;
+    });
+    var sumOk = Math.abs(total - 100) < 0.01;
+
+    var el = document.getElementById("institution-total-percent");
+    if (el) {
+      el.textContent = total.toFixed(2) + "%";
+      el.className = (sumOk && zeros === 0) ? "ok" : "warn";
+    }
+
+    renderTotalNote(
+      document.getElementById("institution-total-note"),
+      zeros,
+      { singular: "instituição", plural: "instituições" },
+      sumOk,
+      total
+    );
+
+    var ifmsInp = document.getElementById("ifms_institution_percentage");
+    if (ifmsInp && parseFloat(ifmsInp.value || "0") > 0) {
+      if (!sumOk) {
+        ifmsInp.setCustomValidity(
+          "A soma das porcentagens das instituições deve ser 100% (atual: " + total.toFixed(2) + "%)."
+        );
+      } else {
+        ifmsInp.setCustomValidity("");
+      }
+    }
+  }
+
+  function recompute() {
+    var inputs = document.querySelectorAll('input[name="coauthor_percentage"], input[name="primary_percentage"]');
+    var total = 0;
+    var zeros = 0;
+    inputs.forEach(function (i) {
+      normalizeNumberInput(i);
+      var res = flagZeroInput(i, "A participação desta pessoa deve ser maior que 0%.");
+      total += res.value;
+      if (res.zero) zeros++;
+    });
+    var sumOk = Math.abs(total - 100) < 0.01;
+
+    var el = document.getElementById("total-percent");
+    if (el) {
+      el.textContent = total.toFixed(2) + "%";
+      el.className = (sumOk && zeros === 0) ? "ok" : "warn";
+    }
+
+    renderTotalNote(
+      document.getElementById("participation-total-note"),
+      zeros,
+      { singular: "participante", plural: "participantes" },
+      sumOk,
+      total
+    );
+
+    var primary = document.querySelector('input[name="primary_percentage"]');
+    if (primary && parseFloat(primary.value || "0") > 0) {
+      if (!sumOk) {
+        primary.setCustomValidity(
+          "A soma das porcentagens dos participantes deve ser 100% (atual: " + total.toFixed(2) + "%)."
+        );
+      } else {
+        primary.setCustomValidity("");
+      }
+    }
+  }
+
+  document.addEventListener("input", function () {
     recompute();
+    recomputeInstitutions();
   });
 
-  const form = document.getElementById("pi-form");
-  if (form) form.addEventListener("submit", recompute);
+  document.querySelectorAll(".add-coauthor-btn").forEach(function (btn) {
+    btn.addEventListener("click", onAddCoauthorClick);
+  });
+
+  function ensureAllPartnerBlocks() {
+    document.querySelectorAll(".partner-institution-row").forEach(function (row) {
+      var key = row.getAttribute("data-institution-key");
+      if (!key) return;
+      var nameInp = row.querySelector(".partner-institution-name");
+      ensureParticipationBlock(key, nameInp ? nameInp.value : "");
+      if (nameInp && !nameInp.dataset.titleBound) {
+        nameInp.dataset.titleBound = "1";
+        nameInp.addEventListener("input", function () {
+          var title = document.querySelector('[data-institution-block="' + key + '"] h3');
+          if (title) title.textContent = nameInp.value || "Instituição parceira";
+        });
+      }
+    });
+  }
+
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    applyMasks(evt.target);
+    applyUploads(evt.target);
+    ensureAllPartnerBlocks();
+    syncParticipationUI();
+  });
 
   applyMasks(document);
   applyUploads(document);
-  recompute();
+  ensureAllPartnerBlocks();
+  syncParticipationUI();
 </script>
-
-<div class="sticky-total">
-  Soma das porcentagens: <span id="total-percent" class="warn">0%</span>
-  <small class="muted">(deve ser exatamente 100%)</small>
-</div>
 
 {% endblock %}

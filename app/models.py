@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
+    Column,
     Date,
     DateTime,
     Enum,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Table,
     Text,
     UniqueConstraint,
     func,
@@ -20,6 +22,28 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+pi_application_fields = Table(
+    "pi_application_fields",
+    Base.metadata,
+    Column("pi_id", ForeignKey("pis.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "application_field_id",
+        ForeignKey("application_fields.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+pi_program_types = Table(
+    "pi_program_types",
+    Base.metadata,
+    Column("pi_id", ForeignKey("pis.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "program_type_id",
+        ForeignKey("program_types.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class UserRole(str, enum.Enum):
@@ -93,18 +117,36 @@ class User(Base):
     pis: Mapped[List["PI"]] = relationship(back_populates="owner")
 
 
+class ApplicationField(Base):
+    __tablename__ = "application_fields"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    pis: Mapped[List["PI"]] = relationship(
+        secondary=pi_application_fields, back_populates="application_fields"
+    )
+
+
+class ProgramType(Base):
+    __tablename__ = "program_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(10), unique=True, index=True, nullable=False)
+    label: Mapped[str] = mapped_column(String(500), nullable=False)
+
+    pis: Mapped[List["PI"]] = relationship(
+        secondary=pi_program_types, back_populates="program_types"
+    )
+
+
 class PI(Base):
     __tablename__ = "pis"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     type: Mapped[PIType] = mapped_column(Enum(PIType, name="pi_type"), nullable=False)
-
-    has_partner: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    partner_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    partner_cnpj: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    partner_contact: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    partner_percentage: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
 
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     status: Mapped[PIStatus] = mapped_column(
@@ -116,8 +158,6 @@ class PI(Base):
     programming_language: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     creation_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
     publication_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
-    application_field: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    program_type: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     source_hash: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     is_derived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     derived_title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -129,19 +169,19 @@ class PI(Base):
     source_code_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     source_code_original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    # Marca-only fields
-    marca_nome: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_tipo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    marca_imagem_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    marca_imagem_original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_idioma_estrangeiro: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
-    marca_termo_estrangeiro: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_traducao: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_termos_colidencia: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    marca_nice: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_viena: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    marca_protecao_indicada: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-    marca_protecao_justificativa: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Brand (marca) fields
+    brand_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    brand_image_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    brand_image_original_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_has_foreign_language: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=False)
+    brand_foreign_term: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_translation: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_collision_terms: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    brand_nice_classification: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_vienna_classification: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    brand_protection_requested: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    brand_protection_justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Admin / correction
     admin_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -164,6 +204,31 @@ class PI(Base):
     notifications: Mapped[List["AdminNotification"]] = relationship(
         cascade="all, delete-orphan"
     )
+    application_fields: Mapped[List["ApplicationField"]] = relationship(
+        secondary=pi_application_fields, back_populates="pis"
+    )
+    program_types: Mapped[List["ProgramType"]] = relationship(
+        secondary=pi_program_types, back_populates="pis"
+    )
+    institutions: Mapped[List["PIInstitution"]] = relationship(
+        back_populates="pi", cascade="all, delete-orphan", order_by="PIInstitution.sort_order"
+    )
+
+
+class PIInstitution(Base):
+    __tablename__ = "pi_institutions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    pi_id: Mapped[int] = mapped_column(ForeignKey("pis.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_ifms: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    percentage: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    cnpj: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    contact: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    pi: Mapped["PI"] = relationship(back_populates="institutions")
+    authors: Mapped[List["PIAuthor"]] = relationship(back_populates="institution")
 
 
 class PIAuthor(Base):
@@ -184,7 +249,9 @@ class PIAuthor(Base):
 
     percentage: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    institution: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="ifms")
+    institution_id: Mapped[int] = mapped_column(
+        ForeignKey("pi_institutions.id", ondelete="RESTRICT"), nullable=False
+    )
     status: Mapped[PIAuthorStatus] = mapped_column(
         Enum(PIAuthorStatus, name="pi_author_status"),
         default=PIAuthorStatus.pending,
@@ -195,11 +262,9 @@ class PIAuthor(Base):
     )
 
     pi: Mapped["PI"] = relationship(back_populates="authors")
+    institution: Mapped["PIInstitution"] = relationship(back_populates="authors")
     profile: Mapped[Optional["AuthorProfile"]] = relationship(
         back_populates="pi_author", uselist=False, cascade="all, delete-orphan"
-    )
-    declarations: Mapped[List["AuthorDeclaration"]] = relationship(
-        back_populates="pi_author", cascade="all, delete-orphan"
     )
     invitations: Mapped[List["Invitation"]] = relationship(
         back_populates="pi_author", cascade="all, delete-orphan"
@@ -241,22 +306,6 @@ class AuthorProfile(Base):
     )
 
     pi_author: Mapped["PIAuthor"] = relationship(back_populates="profile")
-
-
-class AuthorDeclaration(Base):
-    __tablename__ = "author_declarations"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    pi_author_id: Mapped[int] = mapped_column(
-        ForeignKey("pi_authors.id", ondelete="CASCADE"), nullable=False
-    )
-    accepted_truth: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    accepted_confidentiality: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    accepted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-
-    pi_author: Mapped["PIAuthor"] = relationship(back_populates="declarations")
 
 
 class Invitation(Base):
