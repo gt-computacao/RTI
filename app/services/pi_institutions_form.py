@@ -80,10 +80,20 @@ def replace_institutions(
     pi: PI,
     institutions: List[InstitutionInput],
 ) -> Dict[str, PIInstitution]:
-    for inst in list(pi.institutions):
+    old_insts = list(pi.institutions or [])
+    old_ids = {inst.id for inst in old_insts}
+    key_map = save_institutions(db, pi, institutions)
+    new_ids = [row.id for row in key_map.values()]
+    fallback_id = new_ids[0] if new_ids else None
+    if fallback_id is not None:
+        for author in list(getattr(pi, "authors", None) or []):
+            if author.institution_id in old_ids or author.institution_id is None:
+                author.institution_id = fallback_id
+        db.flush()
+    for inst in old_insts:
         db.delete(inst)
     db.flush()
-    return save_institutions(db, pi, institutions)
+    return key_map
 
 
 def institutions_for_template(pi: Optional[PI]) -> Tuple[dict, List[dict]]:
